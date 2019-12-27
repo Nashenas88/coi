@@ -1,0 +1,8 @@
+[package]
+name = "coi"
+version = "0.1.0"
+authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+async-trait = "0.1.22"
