@@ -3,6 +3,9 @@ name = "coi"
 version = "0.1.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Nashenas88/coi"
+description = "coi is a dependency-injection library (currently in the works). The name is an inversion of the initialism IoC (Inversion of Control)."
 
 [dependencies]
 async-trait = "0.1.22"
