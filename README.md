@@ -30,6 +30,4 @@ for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 </sub>
 
-<sub>
 `SPDX-License-Identifier: MIT OR Apache-2.0`
-</sub>
