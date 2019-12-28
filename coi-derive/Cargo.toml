@@ -1,0 +1,18 @@
+[package]
+name = "coi-derive"
+version = "0.1.0"
+authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Nashenas88/coi"
+description = "coi-derive provides procedural macros for use with the coi crate"
+readme = "../README.md"
+categories = ["dependency", "injection", "control"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0.11"
+quote = "1.0.2"
+proc-macro2 = "1.0.6"
