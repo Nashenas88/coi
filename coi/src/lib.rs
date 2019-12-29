@@ -3,6 +3,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
+pub use coi_derive::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -36,6 +37,10 @@ impl std::error::Error for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub trait Injectable: Send + Sync + 'static {}
+
+impl<T: Injectable + ?Sized> Injectable for Arc<T> {}
+
 #[derive(Clone)]
 pub struct Container {
     provider_map: HashMap<String, Arc<dyn Any + Send + Sync + 'static>>,
@@ -45,14 +50,14 @@ impl Container {
     /// Construct or lookup a previously constructed object of type `T` with key `key`.
     pub async fn resolve<T>(&self, key: &str) -> Result<T>
     where
-        T: Send + Sync + 'static,
+        T: Injectable,
     {
         let any_provider = self
             .provider_map
             .get(key)
             .ok_or_else(|| Error::KeyNotFound(key.to_owned()))?;
         let provider = any_provider
-            .downcast_ref::<Arc<dyn Provider<Output = T> + Send + Sync + 'static>>()
+            .downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
             .ok_or_else(|| Error::TypeMismatch(key.to_owned()))?;
         // FIXME(pfaria) memoize results when singleton registration is introduced
         provider.provide(self).await
@@ -76,11 +81,11 @@ impl ContainerBuilder {
     pub fn register<K, P, T>(mut self, key: K, provider: P) -> Self
     where
         K: Into<String>,
-        T: Send + Sync + 'static,
-        P: Provider<Output = T> + Send + Sync + 'static,
+        T: Injectable,
+        P: Provide<Output = T> + Send + Sync + 'static,
     {
         let key = key.into();
-        let provider = Arc::new(provider) as Arc<dyn Provider<Output = T> + Send + Sync + 'static>;
+        let provider = Arc::new(provider) as Arc<dyn Provide<Output = T> + Send + Sync + 'static>;
         self.provider_map.insert(key, Arc::new(provider));
         self
     }
@@ -94,9 +99,9 @@ impl ContainerBuilder {
 }
 
 #[async_trait]
-pub trait Provider {
+pub trait Provide {
     /// The type that this provider is intended to produce
-    type Output: Send + Sync + 'static;
+    type Output: Injectable;
 
     /// Only intended to be used internally
     async fn provide(&self, container: &Container) -> Result<Self::Output>;

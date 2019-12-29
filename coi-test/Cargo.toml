@@ -8,5 +8,6 @@ repository = "https://github.com/Nashenas88/coi"
 readme = "../README.md"
 
 [dependencies]
+async-std = { version = "1.4.0", features = ["attributes"] }
 async-trait = "0.1.22"
 coi = { path = "../coi" }
