@@ -101,7 +101,7 @@ impl ContainerBuilder {
 #[async_trait]
 pub trait Provide {
     /// The type that this provider is intended to produce
-    type Output: Send + Sync + 'static;
+    type Output: Injectable;
 
     /// Only intended to be used internally
     async fn provide(&self, container: &Container) -> Result<Self::Output>;

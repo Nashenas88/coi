@@ -4,7 +4,7 @@ use proc_macro2::{Ident, TokenTree};
 use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, Data, DeriveInput, Error, Fields, FnArg, Path, Result, Type,
+    parse_macro_input, Data, DeriveInput, Error, Fields, Path, Result, Type,
 };
 
 struct Provides {
@@ -27,7 +27,7 @@ impl Parse for Provides {
     }
 }
 
-#[proc_macro_derive(Inject, attributes(provides, inject))]
+#[proc_macro_derive(Injectable, attributes(provides, inject))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let data_struct = match input.data {
@@ -116,33 +116,14 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
         #[async_trait::async_trait]
         impl ::coi::Provide for #provider {
-            type Output = ::std::sync::Arc<dyn #interface + Send + Sync + 'static>;
+            type Output = ::std::sync::Arc<dyn #interface>;
 
             async fn provide(&self, #container: &::coi::Container) -> ::coi::Result<Self::Output> {
                 #( let #arg_ident = #container.resolve::<#arg_type>(#arg_key).await?; )*
                 Ok(::std::sync::Arc::new(#provides_with(#(#arg_ident),*))
-                    as ::std::sync::Arc<dyn #interface + Send + Sync + 'static>)
+                    as ::std::sync::Arc<dyn #interface>)
             }
         }
-    };
-    TokenStream::from(expanded)
-}
-
-#[proc_macro_attribute]
-pub fn inject(_metadata: TokenStream, input: TokenStream) -> TokenStream {
-    let fn_arg = parse_macro_input!(input as FnArg);
-    let arg = match fn_arg {
-        FnArg::Receiver(receiver) => return Error::new_spanned(receiver, "cannot inject `self` args")
-            .to_compile_error()
-            .into(),
-        FnArg::Typed(arg) => arg
-    };
-    let attrs = arg.attrs;
-    let pat = arg.pat;
-    let ty = arg.ty;
-
-    let expanded = quote! {
-        #(#attrs)* #pat : ::std::sync::Arc<#ty + Send + Sync + 'static>
     };
     TokenStream::from(expanded)
 }
