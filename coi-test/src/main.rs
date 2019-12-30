@@ -1,11 +1,11 @@
-use coi::{ContainerBuilder, Injectable};
+use coi::{ContainerBuilder, Inject};
 use std::sync::Arc;
 
-trait Interface1: Injectable {
+trait Interface1: Inject {
     fn describe(&self) -> &'static str;
 }
 
-#[derive(Injectable)]
+#[derive(Inject)]
 #[provides(Interface1 with Impl1::new)]
 struct Impl1;
 
@@ -21,11 +21,11 @@ impl Interface1 for Impl1 {
     }
 }
 
-trait Interface2: Injectable {
+trait Interface2: Inject {
     fn deep_describe(&self) -> String;
 }
 
-#[derive(Injectable)]
+#[derive(Inject)]
 #[provides(Interface2 with Impl2::new)]
 struct Impl2 {
     #[inject]

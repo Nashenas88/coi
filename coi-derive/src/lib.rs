@@ -27,7 +27,7 @@ impl Parse for Provides {
     }
 }
 
-#[proc_macro_derive(Injectable, attributes(provides, inject))]
+#[proc_macro_derive(Inject, attributes(provides, inject))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let data_struct = match input.data {
@@ -110,7 +110,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     );
     let input_ident = input.ident;
     let expanded = quote! {
-        impl Injectable for #input_ident {}
+        impl Inject for #input_ident {}
 
         struct #provider;
 

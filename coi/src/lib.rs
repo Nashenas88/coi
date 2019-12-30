@@ -37,9 +37,9 @@ impl std::error::Error for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait Injectable: Send + Sync + 'static {}
+pub trait Inject: Send + Sync + 'static {}
 
-impl<T: Injectable + ?Sized> Injectable for Arc<T> {}
+impl<T: Inject + ?Sized> Inject for Arc<T> {}
 
 #[derive(Clone)]
 pub struct Container {
@@ -50,7 +50,7 @@ impl Container {
     /// Construct or lookup a previously constructed object of type `T` with key `key`.
     pub async fn resolve<T>(&self, key: &str) -> Result<T>
     where
-        T: Injectable,
+        T: Inject,
     {
         let any_provider = self
             .provider_map
@@ -81,7 +81,7 @@ impl ContainerBuilder {
     pub fn register<K, P, T>(mut self, key: K, provider: P) -> Self
     where
         K: Into<String>,
-        T: Injectable,
+        T: Inject,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
         let key = key.into();
@@ -101,7 +101,7 @@ impl ContainerBuilder {
 #[async_trait]
 pub trait Provide {
     /// The type that this provider is intended to produce
-    type Output: Injectable;
+    type Output: Inject;
 
     /// Only intended to be used internally
     async fn provide(&self, container: &Container) -> Result<Self::Output>;
