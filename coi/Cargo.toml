@@ -7,7 +7,6 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Nashenas88/coi"
 description = "coi is a Dependency Injection library."
 readme = "../README.md"
-categories = ["dependency", "injection", "control"]
 
 [dependencies]
 async-trait = "0.1.22"
