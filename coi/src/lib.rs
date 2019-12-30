@@ -1,3 +1,127 @@
+//! Coi provides an easy to use dependency injection framework.
+//! Currently, this crate provides the following:
+//! - **[`coi::Inject` (trait)]** - a marker trait that indicates a trait is injectable, and that a struct can
+//! be used to implement those injectable traits.
+//! - **[`coi::Provide`]** - a trait that indicates a struct is capable of providing a specific
+//! implementation of some injectable trait. This is generated for you if you use the
+//! [`coi::Inject` (derive)] derive, but can also be written manually.
+//! - **[`coi::Container`]** - a container to manage the lifetime of all dependencies. This is still in its
+//! early stages, and currently only supports objects that are recreated with each request to
+//! resolve.
+//! - **[`coi::ContainerBuilder`]** - a builder for the above container to simplify construction and
+//! guarantee immutability after construction.
+//!
+//! [`coi::Inject` (trait)]: trait.Inject.html
+//! [`coi::Inject` (derive)]: derive.Inject.html
+//! [`coi::Provide`]: trait.Provide.html
+//! [`coi::Container`]: struct.Container.html
+//! [`coi::ContainerBuilder`]: struct.ContainerBuilder.html
+//!
+//! # Example
+//!
+//! ```rust
+//! use async_std;
+//! use coi::{ContainerBuilder, Inject};
+//! use std::sync::Arc;
+//!
+//! // Mark injectable traits by inheriting the `Inject` trait.
+//! trait Trait1: Inject {
+//!     fn describe(&self) -> &'static str;
+//! }
+//!
+//! // For structs that will provide the implementation of an injectable trait, derive `Inject`
+//! // and specify which method will be used to inject which trait. The method can be any path.
+//! // The arguments for the method are derived from fields marked with the attribute `#[inject]`
+//! // (See Impl2 below).
+//! #[derive(Inject)]
+//! // Currently, only one trait can be provided, but this will likely be expanded on in future
+//! // versions of this crate.
+//! #[provides(Trait1 with Impl1::new)]
+//! struct Impl1;
+//!
+//! // The method specified in Provides must return Self (might change in a future version of the
+//! // crate), and must actually exist (it will not be generated for you).
+//! impl Impl1 {
+//!     fn new() -> Self {
+//!         Impl1
+//!     }
+//! }
+//!
+//! // Don't forget to actually implement the trait ;).
+//! impl Trait1 for Impl1 {
+//!     fn describe(&self) -> &'static str {
+//!         "I'm impl1!"
+//!     }
+//! }
+//!
+//! // Mark injectable traits by inheriting the `Inject` trait.
+//! trait Trait2: Inject {
+//!     fn deep_describe(&self) -> String;
+//! }
+//!
+//! // For structs that will provide the implementation of an injectable trait, derive `Inject`
+//! // and specify which method will be used to inject which trait. The arguments for the method
+//! // are derived from fields marked with the attribute `#[inject]` in the order they appear.
+//! // Future versions of this crate might allow you to control the order of the args with
+//! // parameters to the `#[inject]` attribute.
+//! #[derive(Inject)]
+//! #[provides(Trait2 with Impl2::new)]
+//! struct Impl2 {
+//!     // The name of the field is important! It must match the name that's registered in the
+//!     // container when the container is being built! This is similar to the behavior of
+//!     // dependency injection libraries in other languages.
+//!     #[inject]
+//!     trait1: Arc<dyn Trait1>,
+//! }
+//!
+//! // Implement the provider method
+//! impl Impl2 {
+//!     // Note: The param name here doesn't actually matter.
+//!     fn new(trait1: Arc<dyn Trait1>) -> Self {
+//!         Self { trait1 }
+//!     }
+//! }
+//!
+//! // Again, don't forget to actually implement the trait ;).
+//! impl Trait2 for Impl2 {
+//!     fn deep_describe(&self) -> String {
+//!         format!("I'm impl2! and I have {}", self.trait1.describe())
+//!     }
+//! }
+//!
+//! // You might note that Container::resolve is async. This is to allow any provider to be async
+//! // and since we don't know from the resolution perspective whether any provider will need to be
+//! // async, they all have to be. This might be configurable through feature flags in a future
+//! // version of the library.
+//! #[async_std::main]
+//! async fn main() {
+//!     // "Provider" structs are automatically generated through the `Inject` attribute. They
+//!     // append `Provider` to the name of the struct that is being derive (make sure you don't
+//!     // any structs with the same name or your code will fail to compile.
+//!     // Reminder: Make sure you use the same key here as the field names of the structs that
+//!     // require these impls.
+//!     let container = ContainerBuilder::new()
+//!         .register("trait1", Impl1Provider)
+//!         .register("trait2", Impl2Provider)
+//!         .build();
+//!
+//!     // Once the container is built, you can now resolve any particular instance by its key and
+//!     // the trait it provides. This crate currently only supports `Arc<dyn Trait>`, but this may
+//!     // be expanded in a future version of the crate.
+//!     let trait2 = container
+//!         // Note: Getting the key wrong will produce an error telling you which key in the
+//!         // chain of dependencies caused the failure (future versions might provider a vec of
+//!         // chain that lead to the failure). Getting the type wrong will only tell you which key
+//!         // had the wrong type. This is because at runtime, we do not have any type information,
+//!         // only unique ids (that change during each compilation).
+//!         .resolve::<Arc<dyn Trait2>>("trait2")
+//!         .await
+//!         .expect("Should exist");
+//!     println!("Deep description: {}", trait2.deep_describe());
+//! }
+//! ```
+//!
+
 use async_trait::async_trait;
 pub use coi_derive::*;
 use std::any::Any;
