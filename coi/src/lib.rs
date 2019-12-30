@@ -1,9 +1,9 @@
 use async_trait::async_trait;
+pub use coi_derive::*;
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
-pub use coi_derive::*;
 
 #[derive(Debug)]
 pub enum Error {

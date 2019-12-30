@@ -1,7 +1,7 @@
 use coi::{ContainerBuilder, Injectable};
 use std::sync::Arc;
 
-trait Interface1 : Injectable {
+trait Interface1: Injectable {
     fn describe(&self) -> &'static str;
 }
 
@@ -21,7 +21,7 @@ impl Interface1 for Impl1 {
     }
 }
 
-trait Interface2 : Injectable {
+trait Interface2: Injectable {
     fn deep_describe(&self) -> String;
 }
 
@@ -34,14 +34,12 @@ struct Impl2 {
 
 impl Impl2 {
     fn new(interface1: Arc<dyn Interface1>) -> Self {
-        Self {
-            interface1,
-        }
+        Self { interface1 }
     }
 }
 
 impl Interface2 for Impl2 {
-    fn deep_describe(&self) -> String  {
+    fn deep_describe(&self) -> String {
         format!("I'm impl2! and I have {}", self.interface1.describe())
     }
 }
@@ -52,6 +50,9 @@ async fn main() {
         .register("interface1", Impl1Provider)
         .register("interface2", Impl2Provider)
         .build();
-    let interface2 = container.resolve::<Arc<dyn Interface2>>("interface2").await.expect("Should exist");
+    let interface2 = container
+        .resolve::<Arc<dyn Interface2>>("interface2")
+        .await
+        .expect("Should exist");
     println!("Deep description: {}", interface2.deep_describe());
 }
