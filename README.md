@@ -1,6 +1,8 @@
 # coi
 
-![crates.io](https://img.shields.io/crates/v/coi.svg)
+[![Build Status](https://travis-ci.org/Nashenas88/coi.svg?branch=master)](https://travis-ci.org/Nashenas88/coi)
+[![docs.rs](https://docs.rs/coi/badge.svg)](https://docs.rs/coi)
+[![crates.io](https://img.shields.io/crates/v/coi.svg)](https://crates.io/crates/coi)
 
 Dependency Injection in Rust
 
@@ -8,9 +10,7 @@ The goal of this crate is to provide a simple dependency injection framework
 that is easy to use. Performance is not an initial concern, but might be later
 on as the crate matures.
 
-<br/>
-
-### Name
+#### Name
 
 The name coi comes from an inversion of the initialism IoC (Inversion of
 Control).
