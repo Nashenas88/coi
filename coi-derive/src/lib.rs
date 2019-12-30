@@ -109,10 +109,11 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         }
     );
     let input_ident = input.ident;
+    // FIXME(pfaria) make provider visibility configurable, add test for pub
     let expanded = quote! {
         impl Inject for #input_ident {}
 
-        struct #provider;
+        pub struct #provider;
 
         #[async_trait::async_trait]
         impl ::coi::Provide for #provider {
