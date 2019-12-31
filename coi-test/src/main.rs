@@ -1,19 +1,13 @@
 use coi::{ContainerBuilder, Inject};
 use std::sync::Arc;
 
-trait Trait1: Inject {
+pub trait Trait1: Inject {
     fn describe(&self) -> &'static str;
 }
 
 #[derive(Inject)]
-#[provides(Trait1 with Impl1::new)]
+#[provides(dyn Trait1 with Impl1)]
 struct Impl1;
-
-impl Impl1 {
-    fn new() -> Self {
-        Impl1
-    }
-}
 
 impl Trait1 for Impl1 {
     fn describe(&self) -> &'static str {
@@ -21,12 +15,12 @@ impl Trait1 for Impl1 {
     }
 }
 
-trait Trait2: Inject {
+pub trait Trait2: Inject {
     fn deep_describe(&self) -> String;
 }
 
 #[derive(Inject)]
-#[provides(Trait2 with Impl2::new)]
+#[provides(dyn Trait2 with Impl2::new(trait1))]
 struct Impl2 {
     #[inject]
     trait1: Arc<dyn Trait1>,
@@ -43,6 +37,10 @@ impl Trait2 for Impl2 {
         format!("I'm impl2! and I have {}", self.trait1.describe())
     }
 }
+
+#[derive(Inject)]
+#[provides(JustAStruct with JustAStruct)]
+pub struct JustAStruct;
 
 #[async_std::main]
 async fn main() {

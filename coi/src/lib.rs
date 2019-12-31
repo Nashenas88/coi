@@ -36,16 +36,8 @@
 //! #[derive(Inject)]
 //! // Currently, only one trait can be provided, but this will likely be expanded on in future
 //! // versions of this crate.
-//! #[provides(Trait1 with Impl1::new)]
+//! #[provides(dyn Trait1 with Impl1)]
 //! struct Impl1;
-//!
-//! // The method specified in Provides must return Self (might change in a future version of the
-//! // crate), and must actually exist (it will not be generated for you).
-//! impl Impl1 {
-//!     fn new() -> Self {
-//!         Impl1
-//!     }
-//! }
 //!
 //! // Don't forget to actually implement the trait ;).
 //! impl Trait1 for Impl1 {
@@ -65,7 +57,7 @@
 //! // Future versions of this crate might allow you to control the order of the args with
 //! // parameters to the `#[inject]` attribute.
 //! #[derive(Inject)]
-//! #[provides(Trait2 with Impl2::new)]
+//! #[provides(dyn Trait2 with Impl2::new(trait1))]
 //! struct Impl2 {
 //!     // The name of the field is important! It must match the name that's registered in the
 //!     // container when the container is being built! This is similar to the behavior of
