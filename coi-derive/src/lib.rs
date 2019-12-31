@@ -38,7 +38,7 @@ impl Parse for Provides {
 /// This derive proc macro impls `Inject` on the struct it modifies, and also processes two
 /// attributes:
 /// - `#[provides]` - Only one of these is allowed per `#[derive(Inject)]`. It takes the form
-/// ```rust,no_build
+/// ```rust,ignore
 /// #[provides(<vis> <ty> with <expr>)]
 /// ```
 /// It generates a provider struct with visibility `<vis>`
@@ -49,7 +49,7 @@ impl Parse for Provides {
 /// - `#[inject]` - All fields marked `#[inject]` are resolved in the `provide` fn described above.
 /// Given a field `<field_name>: <field_ty>`, this attribute will cause the following resolution to
 /// be generated:
-/// ```rust,no_build
+/// ```rust,ignore
 /// let <field_name> = container.resolve::<<field_ty>>("<field_name>");
 /// ```
 /// Because of this, it's important that the field name MUST match the string that's used to
@@ -58,7 +58,7 @@ impl Parse for Provides {
 /// ## Examples
 ///
 /// Private trait and no dependencies
-/// ```rust,no_build
+/// ```rust,ignore
 /// trait Priv: Inject{}
 ///
 /// #[derive(Inject)]
@@ -67,7 +67,7 @@ impl Parse for Provides {
 /// ```
 ///
 /// Public trait and dependency
-/// ```rust,no_build
+/// ```rust,ignore
 /// pub trait Pub: Inject;
 ///
 /// #[derive(Inject)]
@@ -87,7 +87,7 @@ impl Parse for Provides {
 /// ```
 ///
 /// Struct injection
-/// ```rust,no_build
+/// ```rust,ignore
 /// #[derive(Inject)]
 /// #[provides(pub InjectableStruct with InjectableStruct)]
 /// struct InjectableStruct;
