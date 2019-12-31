@@ -1,13 +1,12 @@
 //! Coi provides an easy to use dependency injection framework.
 //! Currently, this crate provides the following:
-//! - **[`coi::Inject` (trait)]** - a marker trait that indicates a trait is injectable, and that a struct can
-//! be used to implement those injectable traits.
+//! - **[`coi::Inject` (trait)]** - a marker trait that indicates a trait or struct is injectable.
 //! - **[`coi::Provide`]** - a trait that indicates a struct is capable of providing a specific
-//! implementation of some injectable trait. This is generated for you if you use the
-//! [`coi::Inject` (derive)] derive, but can also be written manually.
-//! - **[`coi::Container`]** - a container to manage the lifetime of all dependencies. This is still in its
-//! early stages, and currently only supports objects that are recreated with each request to
-//! resolve.
+//! implementation of some injectable trait. This is generated for you if you use
+//! [`coi::Inject` (derive)], but can also be written manually.
+//! - **[`coi::Container`]** - a container to manage the lifetime of all dependencies. This is still
+//! in its early stages, and currently only supports objects that are recreated with each request to
+//! [`coi::Container::resolve`].
 //! - **[`coi::ContainerBuilder`]** - a builder for the above container to simplify construction and
 //! guarantee immutability after construction.
 //!
@@ -15,6 +14,7 @@
 //! [`coi::Inject` (derive)]: derive.Inject.html
 //! [`coi::Provide`]: trait.Provide.html
 //! [`coi::Container`]: struct.Container.html
+//! [`coi::Container::resolve`]: struct.Container.html#method.resolve
 //! [`coi::ContainerBuilder`]: struct.ContainerBuilder.html
 //!
 //! # Example
@@ -30,7 +30,7 @@
 //! }
 //!
 //! // For structs that will provide the implementation of an injectable trait, derive `Inject`
-//! // and specify which method will be used to inject which trait. The method can be any path.
+//! // and specify which expr will be used to inject which trait. The method can be any path.
 //! // The arguments for the method are derived from fields marked with the attribute `#[inject]`
 //! // (See Impl2 below).
 //! #[derive(Inject)]
@@ -53,9 +53,8 @@
 //!
 //! // For structs that will provide the implementation of an injectable trait, derive `Inject`
 //! // and specify which method will be used to inject which trait. The arguments for the method
-//! // are derived from fields marked with the attribute `#[inject]` in the order they appear.
-//! // Future versions of this crate might allow you to control the order of the args with
-//! // parameters to the `#[inject]` attribute.
+//! // are derived from fields marked with the attribute `#[inject]`, so the parameter name must
+//! // match a field name.
 //! #[derive(Inject)]
 //! #[provides(dyn Trait2 with Impl2::new(trait1))]
 //! struct Impl2 {
