@@ -1,3 +1,7 @@
+//! Coi-derive simplifies implementing the traits provided in the [coi] crate.
+//!
+//! [coi]: https://docs.rs/coi
+
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, TokenTree};
@@ -31,6 +35,66 @@ impl Parse for Provides {
     }
 }
 
+/// This derive proc macro impls `Inject` on the struct it modifies, and also processes two
+/// attributes:
+/// - `#[provides]` - Only one of these is allowed per `#[derive(Inject)]`. It takes the form
+/// ```rust,no_build
+/// #[provides(<vis> <ty> with <expr>)]
+/// ```
+/// It generates a provider struct with visibility `<vis>`
+/// that impls `Provide` with an output type of `Arc<<ty>>`. It will construct `<ty>` with `<expr>`,
+/// and all params to `<expr>` must match the struct fields marked with `#[inject]` (see the next
+/// bullet item). `<vis>` must match the visibility of `<ty>` or you will get code that might not
+/// compile.
+/// - `#[inject]` - All fields marked `#[inject]` are resolved in the `provide` fn described above.
+/// Given a field `<field_name>: <field_ty>`, this attribute will cause the following resolution to
+/// be generated:
+/// ```rust,no_build
+/// let <field_name> = container.resolve::<<field_ty>>("<field_name>");
+/// ```
+/// Because of this, it's important that the field name MUST match the string that's used to
+/// register the provider in the `ContainerBuilder`.
+///
+/// ## Examples
+///
+/// Private trait and no dependencies
+/// ```rust,no_build
+/// trait Priv: Inject{}
+///
+/// #[derive(Inject)]
+/// #[provides(dyn Priv with SimpleStruct)]
+/// struct SimpleStruct;
+/// ```
+///
+/// Public trait and dependency
+/// ```rust,no_build
+/// pub trait Pub: Inject;
+///
+/// #[derive(Inject)]
+/// #[provides(pub dyn Pub with NewStruct::new(dependency)]
+/// struct NewStruct {
+///     #[inject]
+///     dependency: Arc<dyn Dependency>,
+/// }
+///
+/// impl NewStruct {
+///     fn new(dependency: Arc<dyn Dependency>) -> Self {
+///         Self {
+///             dependency
+///         }
+///     }
+/// }
+/// ```
+///
+/// Struct injection
+/// ```rust,no_build
+/// #[derive(Inject)]
+/// #[provides(pub InjectableStruct with InjectableStruct)]
+/// struct InjectableStruct;
+/// ```
+///
+/// If you need some form of constructor fn that takes arguments that are not injected, then you
+/// need to manually implement the `Provide` trait, and this derive will not be usable.
 #[proc_macro_derive(Inject, attributes(provides, inject))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
