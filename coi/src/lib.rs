@@ -17,6 +17,121 @@
 //! [`coi::Container::resolve`]: struct.Container.html#method.resolve
 //! [`coi::ContainerBuilder`]: struct.ContainerBuilder.html
 //!
+//! # How this crate works
+//!
+//! For any trait you wish to abstract over, have it inherit the `Inject` trait. For structs, impl
+//! `Inject` for that struct, e.g.
+//! ```rust
+//! # use coi::Inject;
+//! trait Trait1: Inject {}
+//!
+//! struct Struct1;
+//!
+//! impl Inject for Struct1 {}
+//! ```
+//!
+//! Then, in order to register the injectable item with the [`coi::ContainerBuilder`], you also
+//! need a struct that impls `Provide<Output = T>` where `T` is your trait or struct. `Provide`
+//! exposes a `provide` fn that takes `&self` and `&Container`. When manually implementing `Provide`
+//! you must resolve all dependencies with `container`. Here's an example below:
+//!
+//! ```rust
+//! # use async_trait::async_trait;
+//! # use coi::{Container, Inject, Provide};
+//! # use std::sync::Arc;
+//! # trait Trait1: Inject {}
+//! #
+//! trait Dependency: Inject {}
+//!
+//! struct Impl1 {
+//!     dependency: Arc<dyn Dependency>,
+//! }
+//!
+//! impl Impl1 {
+//!     fn new(dependency: Arc<dyn Dependency>) -> Self {
+//!         Self { dependency }
+//!     }
+//! }
+//!
+//! impl Inject for Impl1 {}
+//!
+//! impl Trait1 for Impl1 {}
+//!
+//! struct Trait1Provider;
+//!
+//! #[async_trait]
+//! impl Provide for Trait1Provider {
+//!     type Output = Arc<dyn Trait1>;
+//!
+//!     async fn provide(&self, container: &Container) -> coi::Result<Self::Output> {
+//!         let dependency = container.resolve::<Arc<dyn Dependency>>("dependency").await?;
+//!         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
+//!     }
+//! }
+//! ```
+//!
+//! The dependency `"dependency"` above of course needs to be registered in order for the call
+//! to `resolve` to not error out:
+//!
+//! ```rust
+//! # use async_trait::async_trait;
+//! # use coi::{Container, ContainerBuilder, Inject, Provide};
+//! # use std::sync::Arc;
+//! # trait Trait1: Inject {}
+//! # trait Dependency: Inject {}
+//! #
+//! # struct Impl1 {
+//! #     dependency: Arc<dyn Dependency>,
+//! # }
+//! # impl Impl1 {
+//! #     fn new(dependency: Arc<dyn Dependency>) -> Self {
+//! #         Self { dependency }
+//! #     }
+//! # }
+//! # impl Inject for Impl1 {}
+//! # impl Trait1 for Impl1 {}
+//! #
+//! # struct Trait1Provider;
+//! #
+//! # #[async_trait]
+//! # impl Provide for Trait1Provider {
+//! #     type Output = Arc<dyn Trait1>;
+//! #     async fn provide(&self, container: &Container) -> coi::Result<Self::Output> {
+//! #         let dependency = container.resolve::<Arc<dyn Dependency>>("dependency").await?;
+//! #         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
+//! #     }
+//! # }
+//! struct DepImpl;
+//!
+//! impl Dependency for DepImpl {}
+//!
+//! impl Inject for DepImpl {}
+//!
+//! struct DependencyProvider;
+//!
+//! #[async_trait]
+//! impl Provide for DependencyProvider {
+//!     type Output = Arc<dyn Dependency>;
+//!
+//!     async fn provide(&self, _: &Container) -> coi::Result<Self::Output> {
+//!         Ok(Arc::new(DepImpl) as Arc<dyn Dependency>)
+//!     }
+//! }
+//!
+//! #[async_std::main]
+//! async fn main() {
+//!     let container = ContainerBuilder::new()
+//!         .register("trait1", Trait1Provider)
+//!         .register("dependency", DependencyProvider)
+//!         .build();
+//!     let trait1 = container.resolve::<Arc<dyn Trait1>>("trait1").await;
+//! }
+//! ```
+//!
+//! In general, you usually won't want to write all of that. You would instead want to use the
+//! procedural macro (see example at the bottom).
+//! The detailed docs for that are at [`coi::Inject` (derive)]
+//!
 //! # Example
 //!
 //! ```rust
@@ -111,7 +226,6 @@
 //!     println!("Deep description: {}", trait2.deep_describe());
 //! }
 //! ```
-//!
 
 use async_trait::async_trait;
 pub use coi_derive::*;
@@ -120,6 +234,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
 
+/// Errors produced by this crate
 #[derive(Debug)]
 pub enum Error {
     /// This key was not found in the container. Either the requested resource was never registered
@@ -150,12 +265,15 @@ impl std::error::Error for Error {
     }
 }
 
+/// Type alias to Result<T, coi::Error>
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A marker trait for injectable traits and structs
 pub trait Inject: Send + Sync + 'static {}
 
 impl<T: Inject + ?Sized> Inject for Arc<T> {}
 
+/// A struct that manages all injected types.
 #[derive(Clone)]
 pub struct Container {
     provider_map: HashMap<String, Arc<dyn Any + Send + Sync + 'static>>,
@@ -213,6 +331,7 @@ impl ContainerBuilder {
     }
 }
 
+/// A trait to manage the construction of an injectable trait or struct.
 #[async_trait]
 pub trait Provide {
     /// The type that this provider is intended to produce

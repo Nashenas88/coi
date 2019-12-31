@@ -10,7 +10,7 @@ readme = "../README.md"
 
 [dependencies]
 async-trait = "0.1.22"
-coi-derive = "0.2.0"
+coi-derive = "0.2.1"
 
 [dev-dependencies]
 async-std = { version = "1.4.0", features = ["attributes"] }
