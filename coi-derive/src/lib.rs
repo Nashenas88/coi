@@ -4,17 +4,19 @@ use proc_macro2::{Ident, TokenTree};
 use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, Data, DeriveInput, Error, Fields, Path, Result, Type,
+    parse_macro_input, Data, DeriveInput, Error, Expr, Fields, Result, Type, Visibility,
 };
 
 struct Provides {
-    interface: Path,
-    with: Path,
+    vis: Visibility,
+    ty: Type,
+    with: Expr,
 }
 
 impl Parse for Provides {
     fn parse(input: ParseStream) -> Result<Self> {
-        let interface = input.parse()?;
+        let vis = input.parse()?;
+        let ty = input.parse()?;
         input.parse().and_then(|ident: Ident| {
             if ident.eq("with") {
                 Ok(())
@@ -22,8 +24,10 @@ impl Parse for Provides {
                 Err(Error::new(ident.span(), "expected `with`"))
             }
         })?;
+        // FIXME(pfaria) we need to limit the kinds of exprs allowed here. Quite a few will
+        // fail to compile
         let with = input.parse()?;
-        Ok(Provides { interface, with })
+        Ok(Provides { vis, ty, with })
     }
 }
 
@@ -85,9 +89,19 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
             let token_stream = TokenStream::from(group.stream());
             parse_macro_input!(token_stream as Provides)
         }
-        _ => panic!(),
+        Some(s) => {
+            return Error::new_spanned(s, "expected `(ty with expr)`")
+                .to_compile_error()
+                .into()
+        }
+        _ => {
+            return Error::new_spanned(attr, "expected `(ty with expr)`")
+                .to_compile_error()
+                .into()
+        }
     };
-    let interface = provides.interface;
+    let vis = provides.vis;
+    let ty = provides.ty;
     let provides_with = provides.with;
 
     if let Some(s) = token_iter.next() {
@@ -109,20 +123,18 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         }
     );
     let input_ident = input.ident;
-    // FIXME(pfaria) make provider visibility configurable, add test for pub
     let expanded = quote! {
         impl Inject for #input_ident {}
 
-        pub struct #provider;
+        #vis struct #provider;
 
         #[async_trait::async_trait]
         impl ::coi::Provide for #provider {
-            type Output = ::std::sync::Arc<dyn #interface>;
+            type Output = ::std::sync::Arc<#ty>;
 
             async fn provide(&self, #container: &::coi::Container) -> ::coi::Result<Self::Output> {
                 #( let #arg_ident = #container.resolve::<#arg_type>(#arg_key).await?; )*
-                Ok(::std::sync::Arc::new(#provides_with(#(#arg_ident),*))
-                    as ::std::sync::Arc<dyn #interface>)
+                Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
             }
         }
     };
