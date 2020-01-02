@@ -263,18 +263,25 @@ impl std::error::Error for Error {
     }
 }
 
-/// Type alias to Result<T, coi::Error>
+/// Type alias to `Result<T, coi::Error>`.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A marker trait for injectable traits and structs
+/// A marker trait for injectable traits and structs.
 pub trait Inject: Send + Sync + 'static {}
 
 impl<T: Inject + ?Sized> Inject for Arc<T> {}
 
+/// Control how the container will call a provider
 #[derive(Clone)]
 pub enum Registration<T> {
+    /// The container will construct a new instance of `T` for every invocation
+    /// of `T::Provide`.
     Normal(T),
+    /// The container will construct a new instance of `T` for each scope
+    /// container created through `Container::scoped`.
     Scoped(T),
+    /// The container will construct a single instance of `T` and reuse it
+    /// throughout all scopes.
     Singleton(T),
 }
 
@@ -373,7 +380,7 @@ impl<'a> Container<'a> {
 
     /// Produce a child container that only contains providers for scoped registrations
     /// Any calls to resolve from the returned container can still use the `self` container
-    /// to resolve any other kinds of registrations
+    /// to resolve any other kinds of registrations.
     pub fn scoped(&'a mut self) -> Container<'a> {
         Container {
             provider_map: self
@@ -392,7 +399,7 @@ impl<'a> Container<'a> {
     }
 }
 
-/// A builder used to construct a `Container`
+/// A builder used to construct a `Container`.
 #[derive(Clone, Default)]
 pub struct ContainerBuilder {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
