@@ -82,20 +82,28 @@ impl Parse for InjectableField {
 /// ## Examples
 ///
 /// Private trait and no dependencies
-/// ```rust,ignore
-/// trait Priv: Inject{}
+/// ```rust
+/// use coi::Inject;
+/// trait Priv: Inject {}
 ///
 /// #[derive(Inject)]
 /// #[provides(dyn Priv with SimpleStruct)]
+/// # pub
 /// struct SimpleStruct;
+/// 
+/// impl Priv for SimpleStruct {}
 /// ```
 ///
 /// Public trait and dependency
-/// ```rust,ignore
-/// pub trait Pub: Inject;
+/// ```rust
+/// use coi::Inject;
+/// use std::sync::Arc;
+/// pub trait Pub: Inject {}
+/// pub trait Dependency: Inject {}
 ///
 /// #[derive(Inject)]
-/// #[provides(pub dyn Pub with NewStruct::new(dependency)]
+/// #[provides(pub dyn Pub with NewStruct::new(dependency))]
+/// # pub
 /// struct NewStruct {
 ///     #[inject]
 ///     dependency: Arc<dyn Dependency>,
@@ -108,12 +116,16 @@ impl Parse for InjectableField {
 ///         }
 ///     }
 /// }
+/// 
+/// impl Pub for NewStruct {}
 /// ```
 ///
 /// Struct injection
-/// ```rust,ignore
+/// ```rust
+/// use coi::Inject;
 /// #[derive(Inject)]
 /// #[provides(pub InjectableStruct with InjectableStruct)]
+/// # pub
 /// struct InjectableStruct;
 /// ```
 ///
