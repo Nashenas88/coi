@@ -1,6 +1,6 @@
 [package]
 name = "coi-derive"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -12,6 +12,6 @@ readme = "../README.md"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1.0.11", features = ["full"] }
+syn = { version = "1.0.12", features = ["full"] }
 quote = "1.0.2"
-proc-macro2 = "1.0.6"
+proc-macro2 = "1.0.7"
