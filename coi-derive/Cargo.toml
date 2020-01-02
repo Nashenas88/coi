@@ -6,7 +6,7 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Nashenas88/coi"
 description = "coi-derive provides procedural macros for coi"
-readme = "../README.md"
+readme = "README.md"
 
 [lib]
 proc-macro = true
