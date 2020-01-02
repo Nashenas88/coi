@@ -8,7 +8,8 @@ use proc_macro2::{Ident, TokenTree};
 use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, Data, DeriveInput, Error, Expr, Fields, Result, Type, Visibility,
+    parse_macro_input, parse_quote, Data, DeriveInput, Error, Expr, Fields, Result, Token, Type,
+    Visibility,
 };
 
 struct Provides {
@@ -32,6 +33,29 @@ impl Parse for Provides {
         // fail to compile
         let with = input.parse()?;
         Ok(Provides { vis, ty, with })
+    }
+}
+
+struct InjectableField {
+    field_name: Ident,
+    inject_ty: Type,
+}
+
+impl Parse for InjectableField {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let field_name = input.parse()?;
+        let _colon_separator: Token![:] = input.parse()?;
+        let arc: Ident = input.parse()?;
+        if !arc.eq("Arc") {
+            return Err(Error::new_spanned(arc, "expected `Arc<...>`"));
+        }
+        let _left_angle: Token![<] = input.parse()?;
+        let inject_ty = input.parse()?;
+        let _right_angle: Token![>] = input.parse()?;
+        Ok(InjectableField {
+            field_name,
+            inject_ty,
+        })
     }
 }
 
@@ -107,18 +131,13 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         }
     };
     let provider = format_ident!("{}Provider", input.ident);
-    let attr = match input
-        .attrs
-        .into_iter()
-        .filter(|attr| {
-            attr.path
-                .segments
-                .first()
-                .map(|p| p.ident.eq("provides"))
-                .unwrap_or(false)
-        })
-        .next()
-    {
+    let attr = match input.attrs.into_iter().find(|attr| {
+        attr.path
+            .segments
+            .first()
+            .map(|p| p.ident.eq("provides"))
+            .unwrap_or(false)
+    }) {
         None => {
             return Error::new_spanned(
                 input.ident,
@@ -131,11 +150,43 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     };
 
     let (arg_ident, arg_type): (Vec<Ident>, Vec<Type>) = match data_struct.fields {
-        Fields::Named(named_fields) => named_fields
-            .named
-            .into_iter()
-            .map(|field| (field.ident.unwrap(), field.ty))
-            .unzip(),
+        Fields::Named(named_fields) => {
+            let injectable_fields: Vec<_> = named_fields
+                .named
+                .into_iter()
+                .map(|field| -> Result<InjectableField> {
+                    let field_name = field.ident.unwrap();
+                    let field_ty = field.ty;
+                    Ok(parse_quote! {
+                        #field_name: #field_ty
+                    })
+                })
+                .collect();
+
+            if injectable_fields.iter().any(|f| f.is_err()) {
+                return injectable_fields
+                    .into_iter()
+                    .fold(Ok(()), |acc, f| match f {
+                        Ok(_) => acc,
+                        Err(e) => match acc {
+                            Ok(()) => Err(e),
+                            Err(mut e2) => {
+                                e2.combine(e);
+                                Err(e2)
+                            }
+                        },
+                    })
+                    .unwrap_err()
+                    .to_compile_error()
+                    .into();
+            }
+
+            injectable_fields
+                .into_iter()
+                .map(Result::unwrap)
+                .map(|field| (field.field_name, field.inject_ty))
+                .unzip()
+        }
         // FIXME(pfaria) add support for unnamed fields by allowing the name to be
         // specified as part of the attribute params
         Fields::Unnamed(_) => {
@@ -180,7 +231,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     let arg_key: Vec<String> = arg_ident.iter().map(|i| i.to_string()).collect();
     let container = format_ident!(
         "{}",
-        if arg_ident.len() == 0 {
+        if arg_ident.is_empty() {
             "_"
         } else {
             "container"
@@ -194,9 +245,12 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
         #[async_trait::async_trait]
         impl ::coi::Provide for #provider {
-            type Output = ::std::sync::Arc<#ty>;
+            type Output = #ty;
 
-            async fn provide(&self, #container: &::coi::Container) -> ::coi::Result<Self::Output> {
+            async fn provide(
+                &self,
+                container: &mut ::coi::Container<'_>,
+            ) -> ::coi::Result<::std::sync::Arc<Self::Output>> {
                 #( let #arg_ident = #container.resolve::<#arg_type>(#arg_key).await?; )*
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
             }
