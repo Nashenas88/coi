@@ -61,10 +61,10 @@
 //!
 //! #[async_trait]
 //! impl Provide for Trait1Provider {
-//!     type Output = Arc<dyn Trait1>;
+//!     type Output = dyn Trait1;
 //!
-//!     async fn provide(&self, container: &Container) -> coi::Result<Self::Output> {
-//!         let dependency = container.resolve::<Arc<dyn Dependency>>("dependency").await?;
+//!     async fn provide(&self, container: &mut Container<'_>) -> coi::Result<Arc<Self::Output>> {
+//!         let dependency = container.resolve::<dyn Dependency>("dependency").await?;
 //!         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //!     }
 //! }
@@ -95,9 +95,9 @@
 //! #
 //! # #[async_trait]
 //! # impl Provide for Trait1Provider {
-//! #     type Output = Arc<dyn Trait1>;
-//! #     async fn provide(&self, container: &Container) -> coi::Result<Self::Output> {
-//! #         let dependency = container.resolve::<Arc<dyn Dependency>>("dependency").await?;
+//! #     type Output = dyn Trait1;
+//! #     async fn provide(&self, container: &mut Container<'_>) -> coi::Result<Arc<Self::Output>> {
+//! #         let dependency = container.resolve::<dyn Dependency>("dependency").await?;
 //! #         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //! #     }
 //! # }
@@ -111,21 +111,20 @@
 //!
 //! #[async_trait]
 //! impl Provide for DependencyProvider {
-//!     type Output = Arc<dyn Dependency>;
+//!     type Output = dyn Dependency;
 //!
-//!     async fn provide(&self, _: &Container) -> coi::Result<Self::Output> {
+//!     async fn provide(&self, _: &mut Container<'_>) -> coi::Result<Arc<Self::Output>> {
 //!         Ok(Arc::new(DepImpl) as Arc<dyn Dependency>)
 //!     }
 //! }
 //!
-//! #[async_std::main]
-//! async fn main() {
-//!     let container = ContainerBuilder::new()
+//! async move {
+//!     let mut container = ContainerBuilder::new()
 //!         .register("trait1", Trait1Provider)
 //!         .register("dependency", DependencyProvider)
 //!         .build();
-//!     let trait1 = container.resolve::<Arc<dyn Trait1>>("trait1").await;
-//! }
+//!     let trait1 = container.resolve::<dyn Trait1>("trait1").await;
+//! };
 //! ```
 //!
 //! In general, you usually won't want to write all of that. You would instead want to use the
@@ -135,7 +134,6 @@
 //! # Example
 //!
 //! ```rust
-//! use async_std;
 //! use coi::{ContainerBuilder, Inject};
 //! use std::sync::Arc;
 //!
@@ -199,14 +197,13 @@
 //! // and since we don't know from the resolution perspective whether any provider will need to be
 //! // async, they all have to be. This might be configurable through feature flags in a future
 //! // version of the library.
-//! #[async_std::main]
-//! async fn main() {
+//! async move {
 //!     // "Provider" structs are automatically generated through the `Inject` attribute. They
 //!     // append `Provider` to the name of the struct that is being derive (make sure you don't
 //!     // any structs with the same name or your code will fail to compile.
 //!     // Reminder: Make sure you use the same key here as the field names of the structs that
 //!     // require these impls.
-//!     let container = ContainerBuilder::new()
+//!     let mut container = ContainerBuilder::new()
 //!         .register("trait1", Impl1Provider)
 //!         .register("trait2", Impl2Provider)
 //!         .build();
@@ -220,15 +217,16 @@
 //!         // chain that lead to the failure). Getting the type wrong will only tell you which key
 //!         // had the wrong type. This is because at runtime, we do not have any type information,
 //!         // only unique ids (that change during each compilation).
-//!         .resolve::<Arc<dyn Trait2>>("trait2")
+//!         .resolve::<dyn Trait2>("trait2")
 //!         .await
 //!         .expect("Should exist");
 //!     println!("Deep description: {}", trait2.deep_describe());
-//! }
+//! };
 //! ```
 
 use async_trait::async_trait;
 pub use coi_derive::*;
+use futures::future::{BoxFuture, FutureExt};
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
@@ -273,34 +271,131 @@ pub trait Inject: Send + Sync + 'static {}
 
 impl<T: Inject + ?Sized> Inject for Arc<T> {}
 
-/// A struct that manages all injected types.
 #[derive(Clone)]
-pub struct Container {
-    provider_map: HashMap<String, Arc<dyn Any + Send + Sync + 'static>>,
+pub enum Registration<T> {
+    Normal(T),
+    Scoped(T),
+    Singleton(T),
 }
 
-impl Container {
-    /// Construct or lookup a previously constructed object of type `T` with key `key`.
-    pub async fn resolve<T>(&self, key: &str) -> Result<T>
+impl<T> Registration<T> {
+    fn as_ref(&self) -> Registration<&T> {
+        match self {
+            Registration::Normal(t) => Registration::Normal(t),
+            Registration::Scoped(t) => Registration::Scoped(t),
+            Registration::Singleton(t) => Registration::Singleton(t),
+        }
+    }
+
+    fn map<F, U>(self, func: F) -> Registration<U>
     where
-        T: Inject,
+        F: Fn(T) -> U,
     {
-        let any_provider = self
-            .provider_map
-            .get(key)
-            .ok_or_else(|| Error::KeyNotFound(key.to_owned()))?;
-        let provider = any_provider
-            .downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
-            .ok_or_else(|| Error::TypeMismatch(key.to_owned()))?;
-        // FIXME(pfaria) memoize results when singleton registration is introduced
-        provider.provide(self).await
+        match self {
+            Registration::Normal(t) => Registration::Normal(func(t)),
+            Registration::Scoped(t) => Registration::Scoped(func(t)),
+            Registration::Singleton(t) => Registration::Singleton(func(t)),
+        }
+    }
+}
+
+/// A struct that manages all injected types.
+pub struct Container<'a> {
+    provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
+    resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
+    parent: Option<&'a mut Container<'a>>,
+}
+
+impl<'a> Clone for Container<'a> {
+    fn clone(&self) -> Self {
+        assert!(self.parent.is_none(), "cannot clone child containers");
+        Self {
+            provider_map: self.provider_map.clone(),
+            resolved_map: self.resolved_map.clone(),
+            parent: None,
+        }
+    }
+}
+
+impl<'a> Container<'a> {
+    /// Construct or lookup a previously constructed object of type `T` with key `key`.
+    pub fn resolve<'b, 'c, 'd, T>(&'b mut self, key: &'c str) -> BoxFuture<'d, Result<Arc<T>>>
+    where
+        'b: 'd,
+        'c: 'd,
+        T: Inject + ?Sized,
+    {
+        async move {
+            // If we already have a resolved version, return it.
+            if self.resolved_map.contains_key(key) {
+                return self
+                    .resolved_map
+                    .get(key)
+                    .unwrap()
+                    .downcast_ref::<Arc<T>>()
+                    .map(Arc::clone)
+                    .ok_or_else(|| Error::TypeMismatch(key.to_owned()));
+            }
+
+            // Try to find the provider
+            let any_provider = match self.provider_map.get(key) {
+                Some(provider) => provider,
+                None => {
+                    // If the key is not found, then we might be a child container. If we have a
+                    // parent, then search it for a possibly valid provider.
+                    return match &mut self.parent {
+                        Some(parent) => parent.resolve::<T>(key).await,
+                        None => Err(Error::KeyNotFound(key.to_owned())),
+                    };
+                }
+            };
+
+            let provider = any_provider.as_ref().map(|p| {
+                p.downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
+                    .map(Arc::clone)
+                    .ok_or_else(|| Error::TypeMismatch(key.to_owned()))
+            });
+
+            match provider {
+                Registration::Normal(p) => Ok(p?.provide(self).await?),
+                Registration::Scoped(p) | Registration::Singleton(p) => {
+                    let provided = p?.provide(self).await?;
+                    self.resolved_map.insert(key.to_owned(), Arc::new(provided));
+                    Ok(self.resolved_map[key]
+                        .downcast_ref::<Arc<T>>()
+                        .map(Arc::clone)
+                        .unwrap())
+                }
+            }
+        }
+        .boxed()
+    }
+
+    /// Produce a child container that only contains providers for scoped registrations
+    /// Any calls to resolve from the returned container can still use the `self` container
+    /// to resolve any other kinds of registrations
+    pub fn scoped(&'a mut self) -> Container<'a> {
+        Container {
+            provider_map: self
+                .provider_map
+                .iter()
+                .filter_map(|(k, v)| match v {
+                    Registration::Scoped(v) => {
+                        Some((k.clone(), Registration::Scoped(Arc::clone(v))))
+                    }
+                    _ => None,
+                })
+                .collect(),
+            resolved_map: HashMap::new(),
+            parent: Some(self),
+        }
     }
 }
 
 /// A builder used to construct a `Container`
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ContainerBuilder {
-    provider_map: HashMap<String, Arc<dyn Any + Send + Sync + 'static>>,
+    provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
 }
 
 impl ContainerBuilder {
@@ -310,23 +405,47 @@ impl ContainerBuilder {
         }
     }
 
-    /// Register a `Provider` for `T`.
-    pub fn register<K, P, T>(mut self, key: K, provider: P) -> Self
+    /// Register a `Provider` for `T` with identifier `key`.
+    #[inline]
+    pub fn register<K, P, T>(self, key: K, provider: P) -> Self
     where
         K: Into<String>,
-        T: Inject,
+        T: Inject + ?Sized,
+        P: Provide<Output = T> + Send + Sync + 'static,
+    {
+        self.register_as(key, Registration::Normal(provider))
+    }
+
+    fn get_arc<P, T>(provider: P) -> Arc<dyn Provide<Output = T> + Send + Sync>
+    where
+        T: Inject + ?Sized,
+        P: Provide<Output = T> + Send + Sync + 'static,
+    {
+        Arc::new(provider)
+    }
+
+    /// Register a `Provider` for `T` with identifier `key`, while also specifying the resolution
+    /// behavior.
+    pub fn register_as<K, P, T>(mut self, key: K, provider: Registration<P>) -> Self
+    where
+        K: Into<String>,
+        T: Inject + ?Sized,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
         let key = key.into();
-        let provider = Arc::new(provider) as Arc<dyn Provide<Output = T> + Send + Sync + 'static>;
-        self.provider_map.insert(key, Arc::new(provider));
+        self.provider_map.insert(
+            key,
+            provider.map(|p| Arc::new(Self::get_arc(p)) as Arc<dyn Any + Send + Sync>),
+        );
         self
     }
 
     /// Consumer this builder to produce a `Container`.
-    pub fn build(self) -> Container {
+    pub fn build(self) -> Container<'static> {
         Container {
             provider_map: self.provider_map,
+            resolved_map: HashMap::new(),
+            parent: None,
         }
     }
 }
@@ -335,10 +454,10 @@ impl ContainerBuilder {
 #[async_trait]
 pub trait Provide {
     /// The type that this provider is intended to produce
-    type Output: Inject;
+    type Output: Inject + ?Sized;
 
     /// Only intended to be used internally
-    async fn provide(&self, container: &Container) -> Result<Self::Output>;
+    async fn provide(&self, container: &mut Container<'_>) -> Result<Arc<Self::Output>>;
 }
 
 #[cfg(test)]

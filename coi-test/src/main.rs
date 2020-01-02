@@ -44,7 +44,7 @@ pub struct JustAStruct;
 
 #[async_std::main]
 async fn main() {
-    let container = ContainerBuilder::new()
+    let mut container = ContainerBuilder::new()
         .register("trait1", Impl1Provider)
         .register("trait2", Impl2Provider)
         .build();
@@ -52,5 +52,5 @@ async fn main() {
         .resolve::<Arc<dyn Trait2>>("trait2")
         .await
         .expect("Should exist");
-    println!("Deep description: {}", trait2.deep_describe());
+    println!("Deep description: {}", trait2.as_ref().deep_describe());
 }
