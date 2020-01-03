@@ -63,7 +63,7 @@
 //! impl Provide for Trait1Provider {
 //!     type Output = dyn Trait1;
 //!
-//!     async fn provide(&self, container: &mut Container<'_>) -> coi::Result<Arc<Self::Output>> {
+//!     async fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
 //!         let dependency = container.resolve::<dyn Dependency>("dependency").await?;
 //!         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //!     }
@@ -96,7 +96,7 @@
 //! # #[async_trait]
 //! # impl Provide for Trait1Provider {
 //! #     type Output = dyn Trait1;
-//! #     async fn provide(&self, container: &mut Container<'_>) -> coi::Result<Arc<Self::Output>> {
+//! #     async fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
 //! #         let dependency = container.resolve::<dyn Dependency>("dependency").await?;
 //! #         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //! #     }
@@ -113,7 +113,7 @@
 //! impl Provide for DependencyProvider {
 //!     type Output = dyn Dependency;
 //!
-//!     async fn provide(&self, _: &mut Container<'_>) -> coi::Result<Arc<Self::Output>> {
+//!     async fn provide(&self, _: &mut Container) -> coi::Result<Arc<Self::Output>> {
 //!         Ok(Arc::new(DepImpl) as Arc<dyn Dependency>)
 //!     }
 //! }
@@ -224,6 +224,7 @@
 //! };
 //! ```
 
+use async_std::sync::Mutex;
 use async_trait::async_trait;
 pub use coi_derive::*;
 use futures::future::{BoxFuture, FutureExt};
@@ -307,29 +308,30 @@ impl<T> Registration<T> {
 }
 
 /// A struct that manages all injected types.
-pub struct Container<'a> {
+#[derive(Clone)]
+pub struct Container {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
     resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
-    parent: Option<&'a mut Container<'a>>,
+    parent: Option<Arc<Mutex<Container>>>,
 }
 
-impl<'a> Clone for Container<'a> {
-    fn clone(&self) -> Self {
-        assert!(self.parent.is_none(), "cannot clone child containers");
-        Self {
-            provider_map: self.provider_map.clone(),
-            resolved_map: self.resolved_map.clone(),
-            parent: None,
-        }
-    }
-}
+// impl Clone for Container {
+//     fn clone(&self) -> Self {
+//         assert!(self.parent.is_none(), "cannot clone child containers");
+//         Self {
+//             provider_map: self.provider_map.clone(),
+//             resolved_map: self.resolved_map.clone(),
+//             parent: None,
+//         }
+//     }
+// }
 
-impl<'a> Container<'a> {
+impl Container {
     /// Construct or lookup a previously constructed object of type `T` with key `key`.
-    pub fn resolve<'b, 'c, 'd, T>(&'b mut self, key: &'c str) -> BoxFuture<'d, Result<Arc<T>>>
+    pub fn resolve<'a, 'b, 'c, T>(&'a mut self, key: &'b str) -> BoxFuture<'c, Result<Arc<T>>>
     where
-        'b: 'd,
-        'c: 'd,
+        'a: 'c,
+        'b: 'c,
         T: Inject + ?Sized,
     {
         async move {
@@ -350,8 +352,8 @@ impl<'a> Container<'a> {
                 None => {
                     // If the key is not found, then we might be a child container. If we have a
                     // parent, then search it for a possibly valid provider.
-                    return match &mut self.parent {
-                        Some(parent) => parent.resolve::<T>(key).await,
+                    return match &self.parent {
+                        Some(parent) => parent.lock().await.resolve::<T>(key).await,
                         None => Err(Error::KeyNotFound(key.to_owned())),
                     };
                 }
@@ -378,12 +380,23 @@ impl<'a> Container<'a> {
         .boxed()
     }
 
+    pub fn scopable(self) -> Scopable {
+        Scopable(Arc::new(Mutex::new(self)))
+    }
+}
+
+pub struct Scopable(Arc<Mutex<Container>>);
+
+impl Scopable {
     /// Produce a child container that only contains providers for scoped registrations
     /// Any calls to resolve from the returned container can still use the `self` container
     /// to resolve any other kinds of registrations.
-    pub fn scoped(&'a mut self) -> Container<'a> {
+    pub async fn scoped(&self) -> Container {
         Container {
             provider_map: self
+                .0
+                .lock()
+                .await
                 .provider_map
                 .iter()
                 .filter_map(|(k, v)| match v {
@@ -394,7 +407,7 @@ impl<'a> Container<'a> {
                 })
                 .collect(),
             resolved_map: HashMap::new(),
-            parent: Some(self),
+            parent: Some(Arc::clone(&self.0)),
         }
     }
 }
@@ -448,7 +461,7 @@ impl ContainerBuilder {
     }
 
     /// Consumer this builder to produce a `Container`.
-    pub fn build(self) -> Container<'static> {
+    pub fn build(self) -> Container {
         Container {
             provider_map: self.provider_map,
             resolved_map: HashMap::new(),
@@ -464,7 +477,7 @@ pub trait Provide {
     type Output: Inject + ?Sized;
 
     /// Only intended to be used internally
-    async fn provide(&self, container: &mut Container<'_>) -> Result<Arc<Self::Output>>;
+    async fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>>;
 }
 
 #[cfg(test)]
