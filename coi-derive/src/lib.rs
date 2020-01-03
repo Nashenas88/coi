@@ -261,7 +261,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
             async fn provide(
                 &self,
-                container: &mut ::coi::Container<'_>,
+                container: &mut ::coi::Container,
             ) -> ::coi::Result<::std::sync::Arc<Self::Output>> {
                 #( let #arg_ident = #container.resolve::<#arg_type>(#arg_key).await?; )*
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
