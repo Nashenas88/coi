@@ -8,8 +8,8 @@ use proc_macro2::{Ident, TokenTree};
 use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote, Data, DeriveInput, Error, Expr, Fields, Result, Token, Type,
-    Visibility,
+    parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Error, Expr, Fields, Result,
+    Token, Type, Visibility,
 };
 
 struct Provides {
@@ -37,25 +37,22 @@ impl Parse for Provides {
 }
 
 struct InjectableField {
-    field_name: Ident,
-    inject_ty: Type,
+    name: Ident,
+    ty: Type,
 }
 
 impl Parse for InjectableField {
     fn parse(input: ParseStream) -> Result<Self> {
-        let field_name = input.parse()?;
+        let name = input.parse()?;
         let _colon_separator: Token![:] = input.parse()?;
         let arc: Ident = input.parse()?;
         if !arc.eq("Arc") {
             return Err(Error::new_spanned(arc, "expected `Arc<...>`"));
         }
         let _left_angle: Token![<] = input.parse()?;
-        let inject_ty = input.parse()?;
+        let ty = input.parse()?;
         let _right_angle: Token![>] = input.parse()?;
-        Ok(InjectableField {
-            field_name,
-            inject_ty,
-        })
+        Ok(InjectableField { name, ty })
     }
 }
 
@@ -90,7 +87,7 @@ impl Parse for InjectableField {
 /// #[provides(dyn Priv with SimpleStruct)]
 /// # pub
 /// struct SimpleStruct;
-/// 
+///
 /// impl Priv for SimpleStruct {}
 /// ```
 ///
@@ -116,7 +113,7 @@ impl Parse for InjectableField {
 ///         }
 ///     }
 /// }
-/// 
+///
 /// impl Pub for NewStruct {}
 /// ```
 ///
@@ -161,7 +158,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         Some(attr) => attr,
     };
 
-    let (arg_ident, arg_type): (Vec<Ident>, Vec<Type>) = match data_struct.fields {
+    let args: Vec<_> = match data_struct.fields {
         Fields::Named(named_fields) => {
             let injectable_fields: Vec<_> = named_fields
                 .named
@@ -193,11 +190,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
                     .into();
             }
 
-            injectable_fields
-                .into_iter()
-                .map(Result::unwrap)
-                .map(|field| (field.field_name, field.inject_ty))
-                .unzip()
+            injectable_fields.into_iter().map(Result::unwrap).collect()
         }
         // FIXME(pfaria) add support for unnamed fields by allowing the name to be
         // specified as part of the attribute params
@@ -206,8 +199,37 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
                 .to_compile_error()
                 .into()
         }
-        Fields::Unit => (vec![], vec![]),
+        Fields::Unit => vec![],
     };
+    let container = format_ident!("{}", if args.is_empty() { "_" } else { "container" });
+
+    let (async_trait, async_token, await_call): (Vec<Attribute>, Vec<Token![async]>, Vec<_>) =
+        if cfg!(feature = "async") {
+            (
+                vec![parse_quote! {# [::coi::async_trait]}],
+                vec![parse_quote! {async}],
+                {
+                    let dot = quote! {.};
+                    let await_tok = quote! {await};
+                    let quoted = quote! {#dot #await_tok};
+                    vec![quoted]
+                },
+            )
+        } else {
+            (vec![], vec![], vec![])
+        };
+
+    let resolve: Vec<_> = args
+        .into_iter()
+        .map(|field| {
+            let ident = field.name;
+            let ty = field.ty;
+            let key = format!("{}", ident);
+            quote! {
+                let #ident = #container.resolve::<#ty>(#key) #( #await_call )* ?;
+            }
+        })
+        .collect();
 
     let attr2 = attr.clone();
     let mut token_iter = attr2.tokens.into_iter();
@@ -240,30 +262,22 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         .into();
     }
 
-    let arg_key: Vec<String> = arg_ident.iter().map(|i| i.to_string()).collect();
-    let container = format_ident!(
-        "{}",
-        if arg_ident.is_empty() {
-            "_"
-        } else {
-            "container"
-        }
-    );
     let input_ident = input.ident;
+
     let expanded = quote! {
         impl Inject for #input_ident {}
 
         #vis struct #provider;
 
-        #[async_trait::async_trait]
+        #( #async_trait )*
         impl ::coi::Provide for #provider {
             type Output = #ty;
 
-            async fn provide(
+            #( #async_token )* fn provide(
                 &self,
-                container: &mut ::coi::Container,
+                #container: &mut ::coi::Container,
             ) -> ::coi::Result<::std::sync::Arc<Self::Output>> {
-                #( let #arg_ident = #container.resolve::<#arg_type>(#arg_key).await?; )*
+                #( #resolve )*
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
             }
         }

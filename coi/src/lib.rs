@@ -36,6 +36,7 @@
 //! you must resolve all dependencies with `container`. Here's an example below:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")] {
 //! # use async_trait::async_trait;
 //! # use coi::{Container, Inject, Provide};
 //! # use std::sync::Arc;
@@ -68,12 +69,14 @@
 //!         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! The dependency `"dependency"` above of course needs to be registered in order for the call
 //! to `resolve` to not error out:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")] {
 //! # use async_trait::async_trait;
 //! # use coi::{Container, ContainerBuilder, Inject, Provide};
 //! # use std::sync::Arc;
@@ -125,6 +128,7 @@
 //!         .build();
 //!     let trait1 = container.resolve::<dyn Trait1>("trait1").await;
 //! };
+//! # }
 //! ```
 //!
 //! In general, you usually won't want to write all of that. You would instead want to use the
@@ -134,6 +138,7 @@
 //! # Example
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")] {
 //! use coi::{ContainerBuilder, Inject};
 //! use std::sync::Arc;
 //!
@@ -222,16 +227,26 @@
 //!         .expect("Should exist");
 //!     println!("Deep description: {}", trait2.deep_describe());
 //! };
+//! # }
 //! ```
 
-use async_std::sync::Mutex;
-use async_trait::async_trait;
-pub use coi_derive::*;
-use futures::future::{BoxFuture, FutureExt};
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
+
+#[cfg(any(feature = "derive", feature = "derive-async"))]
+pub use coi_derive::*;
+
+#[cfg(feature = "async")]
+pub use async_trait::async_trait;
+#[cfg(feature = "async")]
+use futures::future::{BoxFuture, FutureExt};
+
+#[cfg(feature = "async")]
+type Mutex<T> = async_std::sync::Mutex<T>;
+#[cfg(not(feature = "async"))]
+type Mutex<T> = std::sync::Mutex<T>;
 
 /// Errors produced by this crate
 #[derive(Debug)]
@@ -315,70 +330,112 @@ pub struct Container {
     parent: Option<Arc<Mutex<Container>>>,
 }
 
-// impl Clone for Container {
-//     fn clone(&self) -> Self {
-//         assert!(self.parent.is_none(), "cannot clone child containers");
-//         Self {
-//             provider_map: self.provider_map.clone(),
-//             resolved_map: self.resolved_map.clone(),
-//             parent: None,
-//         }
-//     }
-// }
+macro_rules! lock {
+    ($mutex:expr => await) => {
+        $mutex.lock().await
+    };
+    ($mutex:expr) => {
+        $mutex.lock().unwrap()
+    };
+}
 
-impl Container {
-    /// Construct or lookup a previously constructed object of type `T` with key `key`.
-    pub fn resolve<'a, 'b, 'c, T>(&'a mut self, key: &'b str) -> BoxFuture<'c, Result<Arc<T>>>
-    where
-        'a: 'c,
-        'b: 'c,
-        T: Inject + ?Sized,
-    {
-        async move {
-            // If we already have a resolved version, return it.
-            if self.resolved_map.contains_key(key) {
-                return self
-                    .resolved_map
-                    .get(key)
-                    .unwrap()
-                    .downcast_ref::<Arc<T>>()
-                    .map(Arc::clone)
-                    .ok_or_else(|| Error::TypeMismatch(key.to_owned()));
+macro_rules! resolve {
+    (@result_ty $t:ty) => {
+        Result<Arc<$t>>
+    };
+    (@await $expr:expr, await) => {
+        $expr.await
+    };
+    (@await $expr:expr) => {
+        $expr
+    };
+    (@inner <$T:ty> $self:ident $key:ident $($await:ident)?) => {
+        // If we already have a resolved version, return it.
+        if $self.resolved_map.contains_key($key) {
+            return $self
+                .resolved_map
+                .get($key)
+                .unwrap()
+                .downcast_ref::<Arc<$T>>()
+                .map(Arc::clone)
+                .ok_or_else(|| Error::TypeMismatch($key.to_owned()));
+        }
+
+        // Try to find the provider
+        let any_provider = match $self.provider_map.get($key) {
+            Some(provider) => provider,
+            None => {
+                // If the key is not found, then we might be a child container. If we have a
+                // parent, then search it for a possibly valid provider.
+                return match &$self.parent {
+                    Some(parent) => resolve!(
+                        @await
+                        lock!(parent $(=> $await)?).resolve::<$T>($key) $(, $await)?
+                    ),
+                    None => Err(Error::KeyNotFound($key.to_owned())),
+                };
             }
+        };
 
-            // Try to find the provider
-            let any_provider = match self.provider_map.get(key) {
-                Some(provider) => provider,
-                None => {
-                    // If the key is not found, then we might be a child container. If we have a
-                    // parent, then search it for a possibly valid provider.
-                    return match &self.parent {
-                        Some(parent) => parent.lock().await.resolve::<T>(key).await,
-                        None => Err(Error::KeyNotFound(key.to_owned())),
-                    };
-                }
-            };
+        let provider = any_provider.as_ref().map(|p| {
+            p.downcast_ref::<Arc<dyn Provide<Output = $T> + Send + Sync + 'static>>()
+                .map(Arc::clone)
+                .ok_or_else(|| Error::TypeMismatch($key.to_owned()))
+        });
 
-            let provider = any_provider.as_ref().map(|p| {
-                p.downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
+        match provider {
+            Registration::Normal(p) => Ok(resolve!(@await p?.provide($self) $(, $await)?)?),
+            Registration::Scoped(p) | Registration::Singleton(p) => {
+                let provided = resolve!(@await p?.provide($self) $(, $await)?)?;
+                $self.resolved_map.insert($key.to_owned(), Arc::new(provided));
+                Ok($self.resolved_map[$key]
+                    .downcast_ref::<Arc<$T>>()
                     .map(Arc::clone)
-                    .ok_or_else(|| Error::TypeMismatch(key.to_owned()))
-            });
-
-            match provider {
-                Registration::Normal(p) => Ok(p?.provide(self).await?),
-                Registration::Scoped(p) | Registration::Singleton(p) => {
-                    let provided = p?.provide(self).await?;
-                    self.resolved_map.insert(key.to_owned(), Arc::new(provided));
-                    Ok(self.resolved_map[key]
-                        .downcast_ref::<Arc<T>>()
-                        .map(Arc::clone)
-                        .unwrap())
-                }
+                    .unwrap())
             }
         }
-        .boxed()
+    };
+    (@async_wrapped $self:ident $key:ident) => {
+        async move {
+            resolve!(@inner $self $key await T)
+        }
+    };
+    (@def async) => {
+        pub fn resolve<'a, 'b, 'c, T>(
+            &'a mut self,
+            key: &'b str
+        ) -> BoxFuture<'c, resolve!(@result_ty T)>
+        where
+            'a: 'c,
+            'b: 'c,
+            T: Inject + ?Sized,
+        {
+            async move {
+                resolve!{@inner <T> self key await}
+            }
+            .boxed()
+        }
+    };
+    (@def) => {
+        pub fn resolve<T>(&mut self, key: &str) -> resolve!(@result_ty T)
+        where
+            T: Inject + ?Sized,
+        {
+            resolve!{ @inner <T> self key }
+        }
+    };
+    ($($async:ident)?) => {
+        /// Construct or lookup a previously constructed object of type `T` with key `key`.
+        resolve!{@def $($async)? }
     }
+}
+
+impl Container {
+    #[cfg(feature = "async")]
+    resolve! {async}
+
+    #[cfg(not(feature = "async"))]
+    resolve! {}
 
     pub fn scopable(self) -> Scopable {
         Scopable(Arc::new(Mutex::new(self)))
@@ -387,29 +444,42 @@ impl Container {
 
 pub struct Scopable(Arc<Mutex<Container>>);
 
-impl Scopable {
-    /// Produce a child container that only contains providers for scoped registrations
-    /// Any calls to resolve from the returned container can still use the `self` container
-    /// to resolve any other kinds of registrations.
-    pub async fn scoped(&self) -> Container {
-        Container {
-            provider_map: self
-                .0
-                .lock()
-                .await
-                .provider_map
-                .iter()
-                .filter_map(|(k, v)| match v {
-                    Registration::Scoped(v) => {
-                        Some((k.clone(), Registration::Scoped(Arc::clone(v))))
-                    }
-                    _ => None,
-                })
-                .collect(),
-            resolved_map: HashMap::new(),
-            parent: Some(Arc::clone(&self.0)),
+macro_rules! scoped {
+    (@fn $($async:ident $await:ident)?) => {
+        /// Produce a child container that only contains providers for scoped registrations
+        /// Any calls to resolve from the returned container can still use the `self` container
+        /// to resolve any other kinds of registrations.
+        pub $($async)? fn scoped(&self) -> Container {
+            Container {
+                provider_map: lock!(self.0 $(=> $await)?)
+                    .provider_map
+                    .iter()
+                    .filter_map(|(k, v)| match v {
+                        Registration::Scoped(v) => {
+                            Some((k.clone(), Registration::Scoped(Arc::clone(v))))
+                        },
+                        _ => None,
+                    })
+                    .collect(),
+                resolved_map: HashMap::new(),
+                parent: Some(Arc::clone(&self.0)),
+            }
         }
+    };
+    (async) => {
+        scoped!(@fn async await);
+    };
+    () => {
+        scoped!(@fn);
     }
+}
+
+impl Scopable {
+    #[cfg(feature = "async")]
+    scoped!(async);
+
+    #[cfg(not(feature = "async"))]
+    scoped!();
 }
 
 /// A builder used to construct a `Container`.
@@ -470,14 +540,19 @@ impl ContainerBuilder {
     }
 }
 
-/// A trait to manage the construction of an injectable trait or struct.
+#[cfg(feature = "async")]
 #[async_trait]
 pub trait Provide {
-    /// The type that this provider is intended to produce
     type Output: Inject + ?Sized;
 
-    /// Only intended to be used internally
     async fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>>;
+}
+
+#[cfg(not(feature = "async"))]
+pub trait Provide {
+    type Output: Inject + ?Sized;
+
+    fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>>;
 }
 
 #[cfg(test)]
@@ -525,5 +600,34 @@ mod test {
     fn container_is_clonable() {
         let container = ContainerBuilder::new().build();
         let _container = container.clone();
+    }
+}
+
+#[macro_export]
+macro_rules! container {
+    (@registration $provider:ident scoped) => {
+        ::coi::Registration::Scoped($provider)
+    };
+    (@registration $provider:ident singleton) => {
+        ::coi::Registration::Singleton($provider)
+    };
+    (@registration $provider:ident normal) => {
+        ::coi::Registration::Normal($provider)
+    };
+    (@registration $provider:ident) => {
+        ::coi::Registration::Normal($provider)
+    };
+    (@line $builder:ident $key:ident $provider:ident $($call:ident)?) => {
+        $builder = $builder.register_as(stringify!($key), container!(@registration $provider $($call)?));
+    };
+    ($($key:ident => $provider:ident $(. $call:ident)?),+) => {
+        container!{ $( $key => $provider $(. $call)?, )+ }
+    };
+    ($($key:ident => $provider:ident $(. $call:ident)?,)+) => {
+        {
+            let mut builder = ::coi::ContainerBuilder::new();
+            $(container!(@line builder $key $provider $($call)?);)+
+            builder.build()
+        }
     }
 }

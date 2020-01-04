@@ -1,4 +1,4 @@
-use coi::{ContainerBuilder, Inject};
+use coi::{container, Inject};
 use std::sync::Arc;
 
 pub trait Trait1: Inject {
@@ -38,19 +38,27 @@ impl Trait2 for Impl2 {
     }
 }
 
-#[derive(Inject)]
+#[derive(Debug, Inject)]
 #[provides(JustAStruct with JustAStruct)]
 pub struct JustAStruct;
 
-#[async_std::main]
-async fn main() {
-    let mut container = ContainerBuilder::new()
-        .register("trait1", Impl1Provider)
-        .register("trait2", Impl2Provider)
-        .build();
-    let trait2 = container
-        .resolve::<Arc<dyn Trait2>>("trait2")
-        .await
-        .expect("Should exist");
-    println!("Deep description: {}", trait2.as_ref().deep_describe());
+#[test]
+fn main() {
+    async_std::task::block_on(async {
+        let mut container = container! {
+            trait1 => Impl1Provider,
+            trait2 => Impl2Provider,
+            struct => JustAStructProvider,
+        };
+        let trait2 = container
+            .resolve::<dyn Trait2>("trait2")
+            .await
+            .expect("Should exist");
+        println!("Deep description: {}", trait2.as_ref().deep_describe());
+        let a_struct = container
+            .resolve::<JustAStruct>("struct")
+            .await
+            .expect("Should exist");
+        println!("Got struct! {:?}", a_struct);
+    });
 }

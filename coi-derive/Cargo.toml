@@ -19,3 +19,7 @@ proc-macro2 = "1.0.7"
 [dev-dependencies]
 async-trait = "0.1.22"
 coi = { path = "../coi" }
+
+[features]
+default = ["async"]
+async = []

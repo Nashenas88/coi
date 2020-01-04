@@ -1,5 +1,5 @@
 use async_std::task;
-use coi::{ContainerBuilder, Inject, Registration};
+use coi::{container, Inject};
 use std::{ops::Deref, sync::Arc};
 
 trait Dep1: Inject {}
@@ -33,9 +33,9 @@ impl Dep2 for Impl2 {}
 #[test]
 fn normal_registration_always_returns_new_instance() {
     task::block_on(async {
-        let mut container = ContainerBuilder::new()
-            .register_as("dep0", Registration::Normal(Impl0Provider))
-            .build();
+        let mut container = container! {
+            dep0 => Impl0Provider
+        };
 
         let dep0_0 = container.resolve::<Impl0>("dep0").await.unwrap();
         let dep0_1 = container.resolve::<Impl0>("dep0").await.unwrap();
@@ -49,9 +49,9 @@ fn normal_registration_always_returns_new_instance() {
 #[test]
 fn singleton_registration_always_returns_same_instance_even_when_scoped() {
     task::block_on(async {
-        let mut container = ContainerBuilder::new()
-            .register_as("dep1", Registration::Singleton(Impl1Provider))
-            .build();
+        let mut container = container! {
+            dep1 => Impl1Provider.singleton
+        };
 
         let dep1_0 = container.resolve::<dyn Dep1>("dep1").await.unwrap();
         let dep1_1 = container.resolve::<dyn Dep1>("dep1").await.unwrap();
@@ -78,10 +78,10 @@ fn singleton_registration_always_returns_same_instance_even_when_scoped() {
 #[test]
 fn scoped_registration_always_returns_same_instance_within_same_scope() {
     task::block_on(async {
-        let mut container = ContainerBuilder::new()
-            .register_as("dep1", Registration::Singleton(Impl1Provider))
-            .register_as("dep2", Registration::Scoped(Impl2Provider))
-            .build();
+        let mut container = container! {
+            dep1 => Impl1Provider.singleton,
+            dep2 => Impl2Provider.scoped
+        };
 
         let dep2_0 = container.resolve::<dyn Dep2>("dep2").await.unwrap();
         let dep2_1 = container.resolve::<dyn Dep2>("dep2").await.unwrap();

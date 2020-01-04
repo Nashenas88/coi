@@ -1,5 +1,5 @@
 [package]
-name = "coi-test"
+name = "coi-test-no-async"
 version = "0.1.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
@@ -7,5 +7,4 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Nashenas88/coi"
 
 [dependencies]
-async-std = "1.4.0"
-coi = { path = "../coi" }
+coi = { path = "../coi", default-features = false, features = ["derive"] }
