@@ -36,7 +36,7 @@
 //! you must resolve all dependencies with `container`. Here's an example below:
 //!
 //! ```rust
-//! # #[cfg(feature = "derive")] {
+//! # #[cfg(any(feature = "async", feature = "derive-async"))] {
 //! # use async_trait::async_trait;
 //! # use coi::{Container, Inject, Provide};
 //! # use std::sync::Arc;
@@ -72,11 +72,11 @@
 //! # }
 //! ```
 //!
-//! The dependency `"dependency"` above of course needs to be registered in order for the call
+//! The `"dependency"` above of course needs to be registered in order for the call
 //! to `resolve` to not error out:
 //!
 //! ```rust
-//! # #[cfg(feature = "derive")] {
+//! # #[cfg(any(feature = "async", feature="derive-async"))] {
 //! # use async_trait::async_trait;
 //! # use coi::{Container, ContainerBuilder, Inject, Provide};
 //! # use std::sync::Arc;
@@ -122,10 +122,10 @@
 //! }
 //!
 //! async move {
-//!     let mut container = ContainerBuilder::new()
-//!         .register("trait1", Trait1Provider)
-//!         .register("dependency", DependencyProvider)
-//!         .build();
+//!     let mut container = container! {
+//!         trait1 => Trait1Provider,
+//!         dependency => DependencyProvider,
+//!     };
 //!     let trait1 = container.resolve::<dyn Trait1>("trait1").await;
 //! };
 //! # }
@@ -138,7 +138,7 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "derive")] {
+//! # #[cfg(feature = "derive-async")] {
 //! use coi::{ContainerBuilder, Inject};
 //! use std::sync::Arc;
 //!
@@ -208,10 +208,10 @@
 //!     // any structs with the same name or your code will fail to compile.
 //!     // Reminder: Make sure you use the same key here as the field names of the structs that
 //!     // require these impls.
-//!     let mut container = ContainerBuilder::new()
-//!         .register("trait1", Impl1Provider)
-//!         .register("trait2", Impl2Provider)
-//!         .build();
+//!     let mut container = container! {
+//!         trait1 => Impl1Provider,
+//!         trait2 => Impl2Provider,
+//!     };
 //!
 //!     // Once the container is built, you can now resolve any particular instance by its key and
 //!     // the trait it provides. This crate currently only supports `Arc<dyn Trait>`, but this may
