@@ -229,28 +229,28 @@
 //! };
 //! # }
 //! ```
-//! 
+//!
 //! # Features
-//! 
+//!
 //! Compilation taking too long? Turn off features you're not using.
-//! 
+//!
 //! To not use the default, and e.g. only the "async" feature:
 //! ```toml
 //! # Cargo.toml
 //! [dependencies]
 //! coi = { version = "...", default-features = false, features = ["async"] }
 //! ```
-//! 
+//!
 //! - default: `derive-async` - Procedural macros are re-exported, async is available.
 //! - `derive` - Procedural macros are re-exported, but none of the code provides async support.
 //! - `async` - Procedural macros are not re-exported, so all generated code must be written
 //! manually. Async support is available.
 //! - None - Procedural macros are not re-exported and none of the code is async
-//! 
+//!
 //! # Help
-//! 
+//!
 //! ## External traits
-//! 
+//!
 //! Want to inject a trait that's not marked `Inject`? There's a very simple solution!
 //! It works even if the intended trait is not part of your crate.
 //! ```rust
@@ -261,17 +261,17 @@
 //!     ...
 //! # */
 //! }
-//! 
+//!
 //! // your_lib.rs
 //! # /*
 //! use coi::Inject;
 //! use other::Trait;
 //! # */
-//! 
+//!
 //! // Just inherit the intended trait and `Inject` on a trait in your crate,
 //! // and make sure to also impl both traits for the intended provider.
 //! pub trait InjectableTrait : Trait + Inject {}
-//! 
+//!
 //! #[derive(Inject)]
 //! #[provides(pub dyn InjectableTrait with Impl{})]
 //! struct Impl {
@@ -279,32 +279,32 @@
 //!     ...
 //! # */
 //! }
-//! 
+//!
 //! impl Trait for Impl {
 //! # /*
 //!     ...
 //! # */
 //! }
-//! 
+//!
 //! impl InjectableTrait for Impl {}
 //! ```
-//! 
+//!
 //! ## Where are the factory registrations!?
-//! 
+//!
 //! If you're familiar with dependency injection in other languages, you might
 //! be used to factory registration where you can provide a method/closure/lambda/etc.
 //! during registration. Since the crate works off of the `Provide` trait, you would
 //! have to manually implement `Provide` for your factory method. This would also
 //! require you to manually retrieve your dependencies from the passed in `Container`
 //! as shown in the docs above.
-//! 
+//!
 //! ## Why can't I derive `Inject` when my struct contains a reference?
-//! 
+//!
 //! In order to store all of the resolved types, we have to use
 //! [`std::any::Any`], which, unfortunately, has the restriction `Any: 'static`.
 //! This is because it's not yet known if there's a safe way to downcast to a
 //! type with a reference (See the comments in this [tracking issue]).
-//! 
+//!
 //! [`std::any::Any`]: https://doc.rust-lang.org/std/any/trait.Any.html
 //! [tracking issue]: https://github.com/rust-lang/rust/issues/41875
 
@@ -317,7 +317,7 @@ use std::sync::Arc;
 pub use coi_derive::*;
 
 /// A re-export of the `async_trait` attribute from the `async-trait` crate. See [`async-trait`].
-/// 
+///
 /// [`async-trait`]: https://docs.rs/async-trait
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;
@@ -373,7 +373,7 @@ impl<T: Inject + ?Sized> Inject for Arc<T> {}
 pub enum Registration<T> {
     /// `Container` will construct a new instance of `T` for every invocation
     /// of `Container::resolve`.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// # use async_std::task;
@@ -389,10 +389,10 @@ pub enum Registration<T> {
     ///     // same as trait => ImplProvider.normal
     ///     trait => ImplProvider
     /// };
-    /// 
+    ///
     /// let instance_1 = container.resolve::<dyn Trait>("trait").await?;
     /// let instance_2 = container.resolve::<dyn Trait>("trait").await?;
-    /// 
+    ///
     /// // Every instance resolved from the container will be a distinct instance.
     /// assert_ne!(
     ///     instance_1.deref() as &dyn Trait as *const _,
@@ -407,7 +407,7 @@ pub enum Registration<T> {
     Normal(T),
     /// `Container` will construct a new instance of `T` for each scope
     /// container created through `Container::scoped`.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// # use async_std::task;
@@ -422,7 +422,7 @@ pub enum Registration<T> {
     /// let mut container = container! {
     ///     trait => ImplProvider.scoped
     /// };
-    /// 
+    ///
     /// // Every instance resolved within the same scope will be the same instance.
     /// let instance_1 = container.resolve::<dyn Trait>("trait").await?;
     /// let instance_2 = container.resolve::<dyn Trait>("trait").await?;
@@ -433,7 +433,7 @@ pub enum Registration<T> {
     /// {
     ///     let mut scoped = container.scopable().scoped().await;
     ///     let instance_3 = scoped.resolve::<dyn Trait>("trait").await?;
-    /// 
+    ///
     ///     // Since these two were resolved in different scopes, they will never be the
     ///     // same instance.
     ///     assert_ne!(
@@ -450,7 +450,7 @@ pub enum Registration<T> {
     Scoped(T),
     /// The container will construct a single instance of `T` and reuse it
     /// throughout all scopes.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// # use async_std::task;
@@ -465,10 +465,10 @@ pub enum Registration<T> {
     /// let mut container = container! {
     ///     trait => ImplProvider.singleton
     /// };
-    /// 
+    ///
     /// let instance_1 = container.resolve::<dyn Trait>("trait").await?;
     /// let instance_2 = container.resolve::<dyn Trait>("trait").await?;
-    /// 
+    ///
     /// assert_eq!(
     ///     instance_1.deref() as &dyn Trait as *const _,
     ///     instance_2.deref() as &dyn Trait as *const _
@@ -476,7 +476,7 @@ pub enum Registration<T> {
     /// {
     ///     let mut scoped = container.scopable().scoped().await;
     ///     let instance_3 = scoped.resolve::<dyn Trait>("trait").await?;
-    /// 
+    ///
     ///     // Regardless of what scope the instance was resolved it, it will always
     ///     // be the same instance.
     ///     assert_eq!(
@@ -652,7 +652,7 @@ impl Container {
 }
 
 /// An intermediary struct used to construct a scoped container. See [`Container::scopable`]
-/// 
+///
 /// [`Container::scopable`]: struct.Container.html#method.scopable
 pub struct Scopable(Arc<Mutex<Container>>);
 
@@ -823,7 +823,7 @@ mod test {
 }
 
 /// A macro to simplify building of `Container`s.
-/// 
+///
 /// It takes a list of key-value pairs, where the keys are converted to string
 /// keys, and the values are converted into registrations. Normal, singleton
 /// and scoped registrations are possible, with normal being the default:
@@ -845,9 +845,9 @@ mod test {
 ///     scoped_dep => ImplProvider.scoped
 /// };
 /// ```
-/// 
+///
 /// For details on how each registration works, see [`coi::Registration`]
-/// 
+///
 /// [`coi::Registration`]: enum.Registration.html
 #[macro_export]
 macro_rules! container {

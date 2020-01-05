@@ -58,7 +58,7 @@ impl Parse for InjectableField {
 
 /// Generates an impl for `Inject` and also generates a "Provider" struct with its own
 /// `Provide` impl.
-/// 
+///
 /// This derive proc macro impls `Inject` on the struct it modifies, and also processes two
 /// attributes:
 /// - `#[provides]` - Only one of these is allowed per `#[derive(Inject)]`. It takes the form
