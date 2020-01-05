@@ -13,5 +13,5 @@ matrix:
   include:
     - rust: nightly
       script:
-        - cargo test
+        - for dir in coi-test*; do cd $dir; cargo test; cd ..; done
         - cargo update -Z minimal-versions && cargo build

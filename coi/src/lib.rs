@@ -78,7 +78,7 @@
 //! ```rust
 //! # #[cfg(any(feature = "async", feature="derive-async"))] {
 //! # use async_trait::async_trait;
-//! # use coi::{Container, ContainerBuilder, Inject, Provide};
+//! # use coi::{container, Container, Inject, Provide};
 //! # use std::sync::Arc;
 //! # trait Trait1: Inject {}
 //! # trait Dependency: Inject {}
@@ -139,7 +139,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "derive-async")] {
-//! use coi::{ContainerBuilder, Inject};
+//! use coi::{container, Inject};
 //! use std::sync::Arc;
 //!
 //! // Mark injectable traits by inheriting the `Inject` trait.
