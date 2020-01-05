@@ -7,11 +7,11 @@ rust:
   - beta
 
 script:
-  - for dir in coi-test*; do cd $dir; cargo test; cd ..; done
+  - make test
 
 matrix:
   include:
     - rust: nightly
       script:
-        - for dir in coi-test*; do cd $dir; cargo test; cd ..; done
+        - make test
         - cargo update -Z minimal-versions && cargo build
