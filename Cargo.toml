@@ -7,6 +7,3 @@ members = [
     "coi-test-no-derive",
     "coi-test-no-derive-async"
 ]
-
-[patch.crates-io]
-coi-derive = { path = "coi-derive" }
