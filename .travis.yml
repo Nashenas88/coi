@@ -7,7 +7,7 @@ rust:
   - beta
 
 script:
-  - cargo test
+  - for dir in coi-test*; do cd $dir; cargo test; cd ..; done
 
 matrix:
   include:

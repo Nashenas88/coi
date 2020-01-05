@@ -265,7 +265,7 @@ impl Display for Error {
         match self {
             Error::KeyNotFound(s) => write!(f, "Key not found: {}", s),
             Error::TypeMismatch(s) => write!(f, "Type mismatch for key: {}", s),
-            Error::Inner(ptr) => write!(f, "Inner error: {}", ptr.description()),
+            Error::Inner(ptr) => write!(f, "Inner error: {}", ptr),
         }
     }
 }
