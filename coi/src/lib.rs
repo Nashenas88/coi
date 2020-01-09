@@ -290,7 +290,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::{Arc, Mutex};
 
-#[cfg(feature = "derive")]
+#[cfg(any(feature = "derive", feature = "debug"))]
 pub use coi_derive::*;
 #[cfg(feature = "debug")]
 use std::fmt::Debug;
@@ -335,7 +335,7 @@ pub trait Inject: Send + Sync + 'static {}
 impl<T: Inject + ?Sized> Inject for Arc<T> {}
 
 /// Control when `Container` will call `Provide::provide`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Registration<T> {
     /// `Container` will construct a new instance of `T` for every invocation
     /// of `Container::resolve`.
@@ -459,9 +459,9 @@ impl<T> Registration<T> {
         }
     }
 
-    fn map<F, U>(self, func: F) -> Registration<U>
+    fn map<F, U>(self, mut func: F) -> Registration<U>
     where
-        F: Fn(T) -> U,
+        F: FnMut(T) -> U,
     {
         match self {
             Registration::Transient(t) => Registration::Transient(func(t)),
@@ -472,13 +472,13 @@ impl<T> Registration<T> {
 }
 
 /// A struct that manages all injected types.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Container {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
     resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
     parent: Option<Arc<Mutex<Container>>>,
     #[cfg(feature = "debug")]
-    dependency_map: HashMap<String, Vec<String>>,
+    dependency_map: HashMap<String, Vec<&'static str>>,
 }
 
 impl Container {
@@ -548,13 +548,6 @@ impl Container {
     }
 }
 
-#[cfg(feature = "debug")]
-impl Debug for Container {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
-        write!(f, "")
-    }
-}
-
 /// An intermediary struct used to construct a scoped container. See [`Container::scopable`]
 ///
 /// [`Container::scopable`]: struct.Container.html#method.scopable
@@ -591,7 +584,7 @@ impl Scopable {
 pub struct ContainerBuilder {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
     #[cfg(feature = "debug")]
-    dependency_map: HashMap<String, Vec<String>>,
+    dependency_map: HashMap<String, Vec<&'static str>>,
 }
 
 impl ContainerBuilder {
@@ -632,10 +625,18 @@ impl ContainerBuilder {
         P: Provide<Output = T> + Send + Sync + 'static,
     {
         let key = key.into();
+        #[cfg(feature = "debug")]
+        let mut deps = vec![];
         self.provider_map.insert(
-            key,
-            provider.map(|p| Arc::new(Self::get_arc(p)) as Arc<dyn Any + Send + Sync>),
+            key.clone(),
+            provider.map(|p| {
+                #[cfg(feature = "debug")]
+                { deps = p.dependencies(); }
+                Arc::new(Self::get_arc(p)) as Arc<dyn Any + Send + Sync>
+            }),
         );
+        #[cfg(feature = "debug")]
+        self.dependency_map.insert(key, deps);
         self
     }
 

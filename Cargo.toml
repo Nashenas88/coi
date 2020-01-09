@@ -3,6 +3,7 @@ members = [
     "coi",
     "coi-derive",
     "coi-test",
+    "coi-test-debug",
     "coi-test-no-derive",
 ]
 
