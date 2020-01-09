@@ -44,21 +44,17 @@ pub struct JustAStruct;
 
 #[test]
 fn main() {
-    async_std::task::block_on(async {
-        let mut container = container! {
-            trait1 => Impl1Provider,
-            trait2 => Impl2Provider,
-            struct => JustAStructProvider,
-        };
-        let trait2 = container
-            .resolve::<dyn Trait2>("trait2")
-            .await
-            .expect("Should exist");
-        println!("Deep description: {}", trait2.as_ref().deep_describe());
-        let a_struct = container
-            .resolve::<JustAStruct>("struct")
-            .await
-            .expect("Should exist");
-        println!("Got struct! {:?}", a_struct);
-    });
+    let mut container = container! {
+        trait1 => Impl1Provider,
+        trait2 => Impl2Provider,
+        struct => JustAStructProvider
+    };
+    let trait2 = container
+        .resolve::<dyn Trait2>("trait2")
+        .expect("Should exist");
+    println!("Deep description: {}", trait2.as_ref().deep_describe());
+    let a_struct = container
+        .resolve::<JustAStruct>("struct")
+        .expect("Should exist");
+    println!("Got struct! {:?}", a_struct);
 }

@@ -8,8 +8,8 @@ use proc_macro2::{Ident, TokenTree};
 use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Error, Expr, Fields, Result,
-    Token, Type, Visibility,
+    parse_macro_input, parse_quote, Data, DeriveInput, Error, Expr, Fields, Result, Token, Type,
+    Visibility,
 };
 
 struct Provides {
@@ -84,6 +84,7 @@ impl Parse for InjectableField {
 /// Private trait and no dependencies
 /// ```rust
 /// use coi::Inject;
+/// use coi_derive::Inject;
 /// trait Priv: Inject {}
 ///
 /// #[derive(Inject)]
@@ -97,6 +98,7 @@ impl Parse for InjectableField {
 /// Public trait and dependency
 /// ```rust
 /// use coi::Inject;
+/// use coi_derive::Inject;
 /// use std::sync::Arc;
 /// pub trait Pub: Inject {}
 /// pub trait Dependency: Inject {}
@@ -123,6 +125,7 @@ impl Parse for InjectableField {
 /// Struct injection
 /// ```rust
 /// use coi::Inject;
+/// use coi_derive::Inject;
 /// #[derive(Inject)]
 /// #[provides(pub InjectableStruct with InjectableStruct)]
 /// # pub
@@ -206,22 +209,6 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     };
     let container = format_ident!("{}", if args.is_empty() { "_" } else { "container" });
 
-    let (async_trait, async_token, await_call): (Vec<Attribute>, Vec<Token![async]>, Vec<_>) =
-        if cfg!(feature = "async") {
-            (
-                vec![parse_quote! {# [::coi::async_trait]}],
-                vec![parse_quote! {async}],
-                {
-                    let dot = quote! {.};
-                    let await_tok = quote! {await};
-                    let quoted = quote! {#dot #await_tok};
-                    vec![quoted]
-                },
-            )
-        } else {
-            (vec![], vec![], vec![])
-        };
-
     let resolve: Vec<_> = args
         .into_iter()
         .map(|field| {
@@ -229,7 +216,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
             let ty = field.ty;
             let key = format!("{}", ident);
             quote! {
-                let #ident = #container.resolve::<#ty>(#key) #( #await_call )* ?;
+                let #ident = #container.resolve::<#ty>(#key)?;
             }
         })
         .collect();
@@ -272,11 +259,10 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
         #vis struct #provider;
 
-        #( #async_trait )*
         impl ::coi::Provide for #provider {
             type Output = #ty;
 
-            #( #async_token )* fn provide(
+            fn provide(
                 &self,
                 #container: &mut ::coi::Container,
             ) -> ::coi::Result<::std::sync::Arc<Self::Output>> {

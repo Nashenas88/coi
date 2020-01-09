@@ -36,8 +36,6 @@
 //! you must resolve all dependencies with `container`. Here's an example below:
 //!
 //! ```rust
-//! # #[cfg(any(feature = "async", feature = "derive-async"))] {
-//! # use async_trait::async_trait;
 //! # use coi::{Container, Inject, Provide};
 //! # use std::sync::Arc;
 //! # trait Trait1: Inject {}
@@ -60,24 +58,20 @@
 //!
 //! struct Trait1Provider;
 //!
-//! #[async_trait]
 //! impl Provide for Trait1Provider {
 //!     type Output = dyn Trait1;
 //!
-//!     async fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
-//!         let dependency = container.resolve::<dyn Dependency>("dependency").await?;
+//!     fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
+//!         let dependency = container.resolve::<dyn Dependency>("dependency")?;
 //!         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //!     }
 //! }
-//! # }
 //! ```
 //!
 //! The `"dependency"` above of course needs to be registered in order for the call
 //! to `resolve` to not error out:
 //!
 //! ```rust
-//! # #[cfg(any(feature = "async", feature="derive-async"))] {
-//! # use async_trait::async_trait;
 //! # use coi::{container, Container, Inject, Provide};
 //! # use std::sync::Arc;
 //! # trait Trait1: Inject {}
@@ -96,11 +90,10 @@
 //! #
 //! # struct Trait1Provider;
 //! #
-//! # #[async_trait]
 //! # impl Provide for Trait1Provider {
 //! #     type Output = dyn Trait1;
-//! #     async fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
-//! #         let dependency = container.resolve::<dyn Dependency>("dependency").await?;
+//! #     fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
+//! #         let dependency = container.resolve::<dyn Dependency>("dependency")?;
 //! #         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //! #     }
 //! # }
@@ -112,23 +105,19 @@
 //!
 //! struct DependencyProvider;
 //!
-//! #[async_trait]
 //! impl Provide for DependencyProvider {
 //!     type Output = dyn Dependency;
 //!
-//!     async fn provide(&self, _: &mut Container) -> coi::Result<Arc<Self::Output>> {
+//!     fn provide(&self, _: &mut Container) -> coi::Result<Arc<Self::Output>> {
 //!         Ok(Arc::new(DepImpl) as Arc<dyn Dependency>)
 //!     }
 //! }
 //!
-//! async move {
-//!     let mut container = container! {
-//!         trait1 => Trait1Provider,
-//!         dependency => DependencyProvider,
-//!     };
-//!     let trait1 = container.resolve::<dyn Trait1>("trait1").await;
+//! let mut container = container! {
+//!     trait1 => Trait1Provider,
+//!     dependency => DependencyProvider,
 //! };
-//! # }
+//! let trait1 = container.resolve::<dyn Trait1>("trait1");
 //! ```
 //!
 //! In general, you usually won't want to write all of that. You would instead want to use the
@@ -138,7 +127,6 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "derive-async")] {
 //! use coi::{container, Inject};
 //! use std::sync::Arc;
 //!
@@ -198,54 +186,43 @@
 //!     }
 //! }
 //!
-//! // You might note that Container::resolve is async. This is to allow any provider to be async
-//! // and since we don't know from the resolution perspective whether any provider will need to be
-//! // async, they all have to be. This might be configurable through feature flags in a future
-//! // version of the library.
-//! async move {
-//!     // "Provider" structs are automatically generated through the `Inject` attribute. They
-//!     // append `Provider` to the name of the struct that is being derive (make sure you don't
-//!     // any structs with the same name or your code will fail to compile.
-//!     // Reminder: Make sure you use the same key here as the field names of the structs that
-//!     // require these impls.
-//!     let mut container = container! {
-//!         trait1 => Impl1Provider,
-//!         trait2 => Impl2Provider,
-//!     };
-//!
-//!     // Once the container is built, you can now resolve any particular instance by its key and
-//!     // the trait it provides. This crate currently only supports `Arc<dyn Trait>`, but this may
-//!     // be expanded in a future version of the crate.
-//!     let trait2 = container
-//!         // Note: Getting the key wrong will produce an error telling you which key in the
-//!         // chain of dependencies caused the failure (future versions might provider a vec of
-//!         // chain that lead to the failure). Getting the type wrong will only tell you which key
-//!         // had the wrong type. This is because at runtime, we do not have any type information,
-//!         // only unique ids (that change during each compilation).
-//!         .resolve::<dyn Trait2>("trait2")
-//!         .await
-//!         .expect("Should exist");
-//!     println!("Deep description: {}", trait2.deep_describe());
+//! // "Provider" structs are automatically generated through the `Inject` attribute. They
+//! // append `Provider` to the name of the struct that is being derive (make sure you don't
+//! // any structs with the same name or your code will fail to compile.
+//! // Reminder: Make sure you use the same key here as the field names of the structs that
+//! // require these impls.
+//! let mut container = container! {
+//!     trait1 => Impl1Provider,
+//!     trait2 => Impl2Provider,
 //! };
-//! # }
+//!
+//! // Once the container is built, you can now resolve any particular instance by its key and
+//! // the trait it provides. This crate currently only supports `Arc<dyn Trait>`, but this may
+//! // be expanded in a future version of the crate.
+//! let trait2 = container
+//!     // Note: Getting the key wrong will produce an error telling you which key in the
+//!     // chain of dependencies caused the failure (future versions might provider a vec of
+//!     // chain that lead to the failure). Getting the type wrong will only tell you which key
+//!     // had the wrong type. This is because at runtime, we do not have any type information,
+//!     // only unique ids (that change during each compilation).
+//!     .resolve::<dyn Trait2>("trait2")
+//!     .expect("Should exist");
+//! println!("Deep description: {}", trait2.deep_describe());
 //! ```
 //!
 //! # Features
 //!
 //! Compilation taking too long? Turn off features you're not using.
 //!
-//! To not use the default, and e.g. only the "async" feature:
+//! To not use the default:
 //! ```toml
 //! # Cargo.toml
 //! [dependencies]
-//! coi = { version = "...", default-features = false, features = ["async"] }
+//! coi = { version = "...", default-features = false }
 //! ```
 //!
-//! - default: `derive-async` - Procedural macros are re-exported, async is available.
-//! - `derive` - Procedural macros are re-exported, but none of the code provides async support.
-//! - `async` - Procedural macros are not re-exported, so all generated code must be written
-//! manually. Async support is available.
-//! - None - Procedural macros are not re-exported and none of the code is async
+//! - default: `derive` - Procedural macros are re-exported.
+//! - None - Procedural macros are not re-exported.
 //!
 //! # Help
 //!
@@ -311,23 +288,10 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-#[cfg(any(feature = "derive", feature = "derive-async"))]
+#[cfg(feature = "derive")]
 pub use coi_derive::*;
-
-/// A re-export of the `async_trait` attribute from the `async-trait` crate. See [`async-trait`].
-///
-/// [`async-trait`]: https://docs.rs/async-trait
-#[cfg(feature = "async")]
-pub use async_trait::async_trait;
-#[cfg(feature = "async")]
-use futures::future::{BoxFuture, FutureExt};
-
-#[cfg(feature = "async")]
-type Mutex<T> = async_std::sync::Mutex<T>;
-#[cfg(not(feature = "async"))]
-type Mutex<T> = std::sync::Mutex<T>;
 
 /// Errors produced by this crate
 #[derive(Debug)]
@@ -376,7 +340,6 @@ pub enum Registration<T> {
     ///
     /// # Example
     /// ```rust
-    /// # use async_std::task;
     /// # use coi::{container, Inject, Result};
     /// # use std::ops::Deref;
     /// # trait Trait: Inject {}
@@ -384,14 +347,14 @@ pub enum Registration<T> {
     /// # #[provides(dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
-    /// # async fn the_test() -> Result<()> {
+    /// # fn the_test() -> Result<()> {
     /// let mut container = container! {
     ///     // same as trait => ImplProvider.transient
     ///     trait => ImplProvider
     /// };
     ///
-    /// let instance_1 = container.resolve::<dyn Trait>("trait").await?;
-    /// let instance_2 = container.resolve::<dyn Trait>("trait").await?;
+    /// let instance_1 = container.resolve::<dyn Trait>("trait")?;
+    /// let instance_2 = container.resolve::<dyn Trait>("trait")?;
     ///
     /// // Every instance resolved from the container will be a distinct instance.
     /// assert_ne!(
@@ -400,9 +363,7 @@ pub enum Registration<T> {
     /// );
     /// # Ok(())
     /// # }
-    /// # task::block_on(async {
-    /// #     the_test().await.unwrap()
-    /// # });
+    /// # the_test().unwrap()
     /// ```
     Transient(T),
     /// `Container` will construct a new instance of `T` for each scope
@@ -410,7 +371,6 @@ pub enum Registration<T> {
     ///
     /// # Example
     /// ```rust
-    /// # use async_std::task;
     /// # use coi::{container, Inject, Result};
     /// # use std::ops::Deref;
     /// # trait Trait: Inject {}
@@ -418,21 +378,21 @@ pub enum Registration<T> {
     /// # #[provides(dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
-    /// # async fn the_test() -> Result<()> {
+    /// # fn the_test() -> Result<()> {
     /// let mut container = container! {
     ///     trait => ImplProvider.scoped
     /// };
     ///
     /// // Every instance resolved within the same scope will be the same instance.
-    /// let instance_1 = container.resolve::<dyn Trait>("trait").await?;
-    /// let instance_2 = container.resolve::<dyn Trait>("trait").await?;
+    /// let instance_1 = container.resolve::<dyn Trait>("trait")?;
+    /// let instance_2 = container.resolve::<dyn Trait>("trait")?;
     /// assert_eq!(
     ///     instance_1.deref() as &dyn Trait as *const _,
     ///     instance_2.deref() as &dyn Trait as *const _
     /// );
     /// {
-    ///     let mut scoped = container.scopable().scoped().await;
-    ///     let instance_3 = scoped.resolve::<dyn Trait>("trait").await?;
+    ///     let mut scoped = container.scopable().scoped();
+    ///     let instance_3 = scoped.resolve::<dyn Trait>("trait")?;
     ///
     ///     // Since these two were resolved in different scopes, they will never be the
     ///     // same instance.
@@ -443,9 +403,7 @@ pub enum Registration<T> {
     /// }
     /// # Ok(())
     /// # }
-    /// # task::block_on(async {
-    /// #     the_test().await.unwrap()
-    /// # });
+    /// # the_test().unwrap()
     /// ```
     Scoped(T),
     /// The container will construct a single instance of `T` and reuse it
@@ -453,7 +411,6 @@ pub enum Registration<T> {
     ///
     /// # Example
     /// ```rust
-    /// # use async_std::task;
     /// # use coi::{container, Inject, Result};
     /// # use std::ops::Deref;
     /// # trait Trait: Inject {}
@@ -461,21 +418,21 @@ pub enum Registration<T> {
     /// # #[provides(dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
-    /// # async fn the_test() -> Result<()> {
+    /// # fn the_test() -> Result<()> {
     /// let mut container = container! {
     ///     trait => ImplProvider.singleton
     /// };
     ///
-    /// let instance_1 = container.resolve::<dyn Trait>("trait").await?;
-    /// let instance_2 = container.resolve::<dyn Trait>("trait").await?;
+    /// let instance_1 = container.resolve::<dyn Trait>("trait")?;
+    /// let instance_2 = container.resolve::<dyn Trait>("trait")?;
     ///
     /// assert_eq!(
     ///     instance_1.deref() as &dyn Trait as *const _,
     ///     instance_2.deref() as &dyn Trait as *const _
     /// );
     /// {
-    ///     let mut scoped = container.scopable().scoped().await;
-    ///     let instance_3 = scoped.resolve::<dyn Trait>("trait").await?;
+    ///     let mut scoped = container.scopable().scoped();
+    ///     let instance_3 = scoped.resolve::<dyn Trait>("trait")?;
     ///
     ///     // Regardless of what scope the instance was resolved it, it will always
     ///     // be the same instance.
@@ -486,9 +443,7 @@ pub enum Registration<T> {
     /// }
     /// # Ok(())
     /// # }
-    /// # task::block_on(async {
-    /// #     the_test().await.unwrap()
-    /// # });
+    /// # the_test().unwrap()
     /// ```
     Singleton(T),
 }
@@ -522,129 +477,67 @@ pub struct Container {
     parent: Option<Arc<Mutex<Container>>>,
 }
 
-macro_rules! lock {
-    ($mutex:expr => await) => {
-        $mutex.lock().await
-    };
-    ($mutex:expr) => {
-        $mutex.lock().unwrap()
-    };
-}
-
-macro_rules! resolve {
-    (@result_ty $t:ty) => {
-        Result<Arc<$t>>
-    };
-    (@await $expr:expr, await) => {
-        $expr.await
-    };
-    (@await $expr:expr) => {
-        $expr
-    };
-    (@inner <$T:ty> $self:ident $key:ident $($await:ident)?) => {
+impl Container {
+    /// Construct or lookup a previously constructed object of type `T` with key `key`.
+    pub fn resolve<T>(&mut self, key: &str) -> Result<Arc<T>>
+    where
+        T: Inject + ?Sized,
+    {
         // If we already have a resolved version, return it.
-        if $self.resolved_map.contains_key($key) {
-            return $self
+        if self.resolved_map.contains_key(key) {
+            return self
                 .resolved_map
-                .get($key)
+                .get(key)
                 .unwrap()
-                .downcast_ref::<Arc<$T>>()
+                .downcast_ref::<Arc<T>>()
                 .map(Arc::clone)
-                .ok_or_else(|| Error::TypeMismatch($key.to_owned()));
+                .ok_or_else(|| Error::TypeMismatch(key.to_owned()));
         }
 
         // Try to find the provider
-        let any_provider = match $self.provider_map.get($key) {
+        let any_provider = match self.provider_map.get(key) {
             Some(provider) => provider,
             None => {
                 // If the key is not found, then we might be a child container. If we have a
                 // parent, then search it for a possibly valid provider.
-                return match &$self.parent {
-                    Some(parent) => resolve!(
-                        @await
-                        lock!(parent $(=> $await)?).resolve::<$T>($key) $(, $await)?
-                    ),
-                    None => Err(Error::KeyNotFound($key.to_owned())),
+                return match &self.parent {
+                    Some(parent) => parent.lock().unwrap().resolve::<T>(key),
+                    None => Err(Error::KeyNotFound(key.to_owned())),
                 };
             }
         };
 
         let provider = any_provider.as_ref().map(|p| {
-            p.downcast_ref::<Arc<dyn Provide<Output = $T> + Send + Sync + 'static>>()
+            p.downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
                 .map(Arc::clone)
-                .ok_or_else(|| Error::TypeMismatch($key.to_owned()))
+                .ok_or_else(|| Error::TypeMismatch(key.to_owned()))
         });
 
         match provider {
-            Registration::Transient(p) => Ok(resolve!(@await p?.provide($self) $(, $await)?)?),
+            Registration::Normal(p) => Ok(resolve!(@await p?.provide($self) $(, $await)?)?),
             Registration::Scoped(p) | Registration::Singleton(p) => {
-                let provided = resolve!(@await p?.provide($self) $(, $await)?)?;
-                $self.resolved_map.insert($key.to_owned(), Arc::new(provided));
-                Ok($self.resolved_map[$key]
-                    .downcast_ref::<Arc<$T>>()
+                let provided = p?.provide(self)?;
+                self.resolved_map.insert(key.to_owned(), Arc::new(provided));
+                Ok(self.resolved_map[key]
+                    .downcast_ref::<Arc<T>>()
                     .map(Arc::clone)
                     .unwrap())
             }
         }
-    };
-    (@async_wrapped $self:ident $key:ident) => {
-        async move {
-            resolve!(@inner $self $key await T)
-        }
-    };
-    (@def async) => {
-        pub fn resolve<'a, 'b, 'c, T>(
-            &'a mut self,
-            key: &'b str
-        ) -> BoxFuture<'c, resolve!(@result_ty T)>
-        where
-            'a: 'c,
-            'b: 'c,
-            T: Inject + ?Sized,
-        {
-            async move {
-                resolve!{@inner <T> self key await}
-            }
-            .boxed()
-        }
-    };
-    (@def) => {
-        pub fn resolve<T>(&mut self, key: &str) -> resolve!(@result_ty T)
-        where
-            T: Inject + ?Sized,
-        {
-            resolve!{ @inner <T> self key }
-        }
-    };
-    ($($async:ident)?) => {
-        /// Construct or lookup a previously constructed object of type `T` with key `key`.
-        resolve!{@def $($async)? }
     }
-}
-
-impl Container {
-    #[cfg(feature = "async")]
-    resolve! {async}
-
-    #[cfg(not(feature = "async"))]
-    resolve! {}
 
     /// Produce an object that can be converted into a scoped container.
     /// ```rust
-    /// # #[cfg(any(feature = "async", feature = "derive-async"))] {
     /// # use coi::{container, Inject};
     /// # trait Trait : Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
-    /// # async move {
     /// let mut container = container! {
     ///     trait => ImplProvider.scoped
     /// };
-    /// let mut scoped_container = container.scopable().scoped().await;
-    /// # };
-    /// # }
+    /// let mut scoped_container = container.scopable().scoped();
     /// ```
     pub fn scopable(self) -> Scopable {
         Scopable(Arc::new(Mutex::new(self)))
@@ -656,42 +549,29 @@ impl Container {
 /// [`Container::scopable`]: struct.Container.html#method.scopable
 pub struct Scopable(Arc<Mutex<Container>>);
 
-macro_rules! scoped {
-    (@fn $($async:ident $await:ident)?) => {
-        /// Produce a child container that only contains providers for scoped registrations
-        /// Any calls to resolve from the returned container can still use the `self` container
-        /// to resolve any other kinds of registrations.
-        pub $($async)? fn scoped(&self) -> Container {
-            Container {
-                provider_map: lock!(self.0 $(=> $await)?)
-                    .provider_map
-                    .iter()
-                    .filter_map(|(k, v)| match v {
-                        Registration::Scoped(v) => {
-                            Some((k.clone(), Registration::Scoped(Arc::clone(v))))
-                        },
-                        _ => None,
-                    })
-                    .collect(),
-                resolved_map: HashMap::new(),
-                parent: Some(Arc::clone(&self.0)),
-            }
-        }
-    };
-    (async) => {
-        scoped!(@fn async await);
-    };
-    () => {
-        scoped!(@fn);
-    }
-}
-
 impl Scopable {
-    #[cfg(feature = "async")]
-    scoped!(async);
-
-    #[cfg(not(feature = "async"))]
-    scoped!();
+    /// Produce a child container that only contains providers for scoped registrations
+    /// Any calls to resolve from the returned container can still use the `self` container
+    /// to resolve any other kinds of registrations.
+    pub fn scoped(&self) -> Container {
+        Container {
+            provider_map: self
+                .0
+                .lock()
+                .unwrap()
+                .provider_map
+                .iter()
+                .filter_map(|(k, v)| match v {
+                    Registration::Scoped(v) => {
+                        Some((k.clone(), Registration::Scoped(Arc::clone(v))))
+                    }
+                    _ => None,
+                })
+                .collect(),
+            resolved_map: HashMap::new(),
+            parent: Some(Arc::clone(&self.0)),
+        }
+    }
 }
 
 /// A builder used to construct a `Container`.
@@ -754,18 +634,6 @@ impl ContainerBuilder {
 }
 
 /// A trait to manage the construction of an injectable trait or struct.
-#[cfg(feature = "async")]
-#[async_trait]
-pub trait Provide {
-    /// The type that this provider is intended to produce
-    type Output: Inject + ?Sized;
-
-    /// Only intended to be used internally
-    async fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>>;
-}
-
-/// A trait to manage the construction of an injectable trait or struct.
-#[cfg(not(feature = "async"))]
 pub trait Provide {
     /// The type that this provider is intended to produce
     type Output: Inject + ?Sized;

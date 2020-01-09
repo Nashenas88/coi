@@ -9,13 +9,8 @@ description = "coi is a Dependency Injection library."
 readme = "../README.md"
 
 [dependencies]
-async-std = { version = "1.4.0", optional = true }
-async-trait = { version = "0.1.22", optional = true }
 coi-derive = { version = "0.4.1", optional = true, default-features = false }
-futures = { version = "0.3.1", optional = true }
 
 [features]
-default = ["derive-async"]
+default = ["derive"]
 derive = ["coi-derive"]
-async = ["async-std", "async-trait", "futures"]
-derive-async = ["coi-derive/async", "async"]

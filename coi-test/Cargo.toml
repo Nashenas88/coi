@@ -7,5 +7,4 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Nashenas88/coi"
 
 [dependencies]
-async-std = "1.4.0"
 coi = { path = "../coi" }
