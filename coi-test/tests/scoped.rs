@@ -31,7 +31,7 @@ impl Dep1 for Impl1 {}
 impl Dep2 for Impl2 {}
 
 #[test]
-fn normal_registration_always_returns_new_instance() {
+fn transient_registration_always_returns_new_instance() {
     task::block_on(async {
         let mut container = container! {
             dep0 => Impl0Provider
