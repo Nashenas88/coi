@@ -514,7 +514,7 @@ impl Container {
         });
 
         match provider {
-            Registration::Normal(p) => Ok(resolve!(@await p?.provide($self) $(, $await)?)?),
+            Registration::Transient(p) => p?.provide(self),
             Registration::Scoped(p) | Registration::Singleton(p) => {
                 let provided = p?.provide(self)?;
                 self.resolved_map.insert(key.to_owned(), Arc::new(provided));

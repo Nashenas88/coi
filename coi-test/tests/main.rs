@@ -71,7 +71,10 @@ fn can_send_through_threads() {
     let container = Arc::new(Mutex::new(container));
     let thread_container = Arc::clone(&container);
     let thread = std::thread::spawn(move || {
-        let _trait1 = thread_container.lock().unwrap().resolve::<dyn Trait1>("trait1");
+        let _trait1 = thread_container
+            .lock()
+            .unwrap()
+            .resolve::<dyn Trait1>("trait1");
     });
     thread.join().expect("Couldn't join thread");
 }
