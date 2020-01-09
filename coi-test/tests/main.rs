@@ -58,3 +58,20 @@ fn main() {
         .expect("Should exist");
     println!("Got struct! {:?}", a_struct);
 }
+
+#[test]
+fn can_send_through_threads() {
+    use std::sync::Mutex;
+    let mut container = container! {
+        trait1 => Impl1Provider,
+    };
+    let _trait1 = container
+        .resolve::<dyn Trait1>("trait1")
+        .expect("Should exist");
+    let container = Arc::new(Mutex::new(container));
+    let thread_container = Arc::clone(&container);
+    let thread = std::thread::spawn(move || {
+        let _trait1 = thread_container.lock().unwrap().resolve::<dyn Trait1>("trait1");
+    });
+    thread.join().expect("Couldn't join thread");
+}
