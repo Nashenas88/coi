@@ -386,7 +386,7 @@ pub enum Registration<T> {
     /// # impl Trait for Impl {}
     /// # async fn the_test() -> Result<()> {
     /// let mut container = container! {
-    ///     // same as trait => ImplProvider.normal
+    ///     // same as trait => ImplProvider.transient
     ///     trait => ImplProvider
     /// };
     ///
@@ -404,7 +404,7 @@ pub enum Registration<T> {
     /// #     the_test().await.unwrap()
     /// # });
     /// ```
-    Normal(T),
+    Transient(T),
     /// `Container` will construct a new instance of `T` for each scope
     /// container created through `Container::scoped`.
     ///
@@ -496,7 +496,7 @@ pub enum Registration<T> {
 impl<T> Registration<T> {
     fn as_ref(&self) -> Registration<&T> {
         match self {
-            Registration::Normal(t) => Registration::Normal(t),
+            Registration::Transient(t) => Registration::Transient(t),
             Registration::Scoped(t) => Registration::Scoped(t),
             Registration::Singleton(t) => Registration::Singleton(t),
         }
@@ -507,7 +507,7 @@ impl<T> Registration<T> {
         F: Fn(T) -> U,
     {
         match self {
-            Registration::Normal(t) => Registration::Normal(func(t)),
+            Registration::Transient(t) => Registration::Transient(func(t)),
             Registration::Scoped(t) => Registration::Scoped(func(t)),
             Registration::Singleton(t) => Registration::Singleton(func(t)),
         }
@@ -576,7 +576,7 @@ macro_rules! resolve {
         });
 
         match provider {
-            Registration::Normal(p) => Ok(resolve!(@await p?.provide($self) $(, $await)?)?),
+            Registration::Transient(p) => Ok(resolve!(@await p?.provide($self) $(, $await)?)?),
             Registration::Scoped(p) | Registration::Singleton(p) => {
                 let provided = resolve!(@await p?.provide($self) $(, $await)?)?;
                 $self.resolved_map.insert($key.to_owned(), Arc::new(provided));
@@ -716,7 +716,7 @@ impl ContainerBuilder {
         T: Inject + ?Sized,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
-        self.register_as(key, Registration::Normal(provider))
+        self.register_as(key, Registration::Transient(provider))
     }
 
     fn get_arc<P, T>(provider: P) -> Arc<dyn Provide<Output = T> + Send + Sync>
@@ -825,8 +825,8 @@ mod test {
 /// A macro to simplify building of `Container`s.
 ///
 /// It takes a list of key-value pairs, where the keys are converted to string
-/// keys, and the values are converted into registrations. Normal, singleton
-/// and scoped registrations are possible, with normal being the default:
+/// keys, and the values are converted into registrations. Transient, singleton
+/// and scoped registrations are possible, with transient being the default:
 /// ```rust
 /// use coi::{container, Inject};
 ///
@@ -840,7 +840,7 @@ mod test {
 ///
 /// let mut container = container! {
 ///     dep => ImplProvider,
-///     normal_dep => ImplProvider.normal,
+///     transient_dep => ImplProvider.transient,
 ///     singleton_dep => ImplProvider.singleton,
 ///     scoped_dep => ImplProvider.scoped
 /// };
@@ -857,11 +857,11 @@ macro_rules! container {
     (@registration $provider:ident singleton) => {
         ::coi::Registration::Singleton($provider)
     };
-    (@registration $provider:ident normal) => {
-        ::coi::Registration::Normal($provider)
+    (@registration $provider:ident transient) => {
+        ::coi::Registration::Transient($provider)
     };
     (@registration $provider:ident) => {
-        ::coi::Registration::Normal($provider)
+        ::coi::Registration::Transient($provider)
     };
     (@line $builder:ident $key:ident $provider:ident $($call:ident)?) => {
         $builder = $builder.register_as(stringify!($key), container!(@registration $provider $($call)?));
