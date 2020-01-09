@@ -5,3 +5,6 @@ members = [
     "coi-test",
     "coi-test-no-derive",
 ]
+
+[patch.crates-io]
+coi-derive = { path = "coi-derive" }

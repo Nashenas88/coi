@@ -209,17 +209,20 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     };
     let container = format_ident!("{}", if args.is_empty() { "_" } else { "container" });
 
-    let resolve: Vec<_> = args
+    let (resolve, keys): (Vec<_>, Vec<_>) = args
         .into_iter()
         .map(|field| {
             let ident = field.name;
             let ty = field.ty;
             let key = format!("{}", ident);
-            quote! {
-                let #ident = #container.resolve::<#ty>(#key)?;
-            }
+            (
+                quote! {
+                    let #ident = #container.resolve::<#ty>(#key)?;
+                },
+                key,
+            )
         })
-        .collect();
+        .unzip();
 
     let attr2 = attr.clone();
     let mut token_iter = attr2.tokens.into_iter();
@@ -254,6 +257,22 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
     let input_ident = input.ident;
 
+    let dependencies_fn = if cfg!(feature = "debug") {
+        vec![{
+            quote! {
+                fn dependencies(
+                    &self
+                ) -> Vec<&'static str> {
+                    vec![
+                        #( #keys, )*
+                    ]
+                }
+            }
+        }]
+    } else {
+        vec![]
+    };
+
     let expanded = quote! {
         impl Inject for #input_ident {}
 
@@ -269,6 +288,8 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
                 #( #resolve )*
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
             }
+
+            #( #dependencies_fn )*
         }
     };
     TokenStream::from(expanded)

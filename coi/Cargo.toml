@@ -14,3 +14,4 @@ coi-derive = { version = "0.4.1", optional = true, default-features = false }
 [features]
 default = ["derive"]
 derive = ["coi-derive"]
+debug = ["coi-derive/debug"]

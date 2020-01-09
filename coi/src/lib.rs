@@ -292,6 +292,8 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "derive")]
 pub use coi_derive::*;
+#[cfg(feature = "debug")]
+use std::fmt::Debug;
 
 /// Errors produced by this crate
 #[derive(Debug)]
@@ -475,6 +477,8 @@ pub struct Container {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
     resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
     parent: Option<Arc<Mutex<Container>>>,
+    #[cfg(feature = "debug")]
+    dependency_map: HashMap<String, Vec<String>>,
 }
 
 impl Container {
@@ -544,6 +548,13 @@ impl Container {
     }
 }
 
+#[cfg(feature = "debug")]
+impl Debug for Container {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        write!(f, "")
+    }
+}
+
 /// An intermediary struct used to construct a scoped container. See [`Container::scopable`]
 ///
 /// [`Container::scopable`]: struct.Container.html#method.scopable
@@ -554,11 +565,9 @@ impl Scopable {
     /// Any calls to resolve from the returned container can still use the `self` container
     /// to resolve any other kinds of registrations.
     pub fn scoped(&self) -> Container {
+        let container: &Container = &self.0.lock().unwrap();
         Container {
-            provider_map: self
-                .0
-                .lock()
-                .unwrap()
+            provider_map: container
                 .provider_map
                 .iter()
                 .filter_map(|(k, v)| match v {
@@ -569,6 +578,9 @@ impl Scopable {
                 })
                 .collect(),
             resolved_map: HashMap::new(),
+            // FIXME(pfaria) no clone here
+            #[cfg(feature = "debug")]
+            dependency_map: container.dependency_map.clone(),
             parent: Some(Arc::clone(&self.0)),
         }
     }
@@ -578,6 +590,8 @@ impl Scopable {
 #[derive(Clone, Default)]
 pub struct ContainerBuilder {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
+    #[cfg(feature = "debug")]
+    dependency_map: HashMap<String, Vec<String>>,
 }
 
 impl ContainerBuilder {
@@ -585,6 +599,8 @@ impl ContainerBuilder {
     pub fn new() -> Self {
         Self {
             provider_map: HashMap::new(),
+            #[cfg(feature = "debug")]
+            dependency_map: HashMap::new(),
         }
     }
 
@@ -629,6 +645,8 @@ impl ContainerBuilder {
             provider_map: self.provider_map,
             resolved_map: HashMap::new(),
             parent: None,
+            #[cfg(feature = "debug")]
+            dependency_map: self.dependency_map,
         }
     }
 }
@@ -640,6 +658,10 @@ pub trait Provide {
 
     /// Only intended to be used internally
     fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>>;
+
+    /// Return list of dependencies
+    #[cfg(feature = "debug")]
+    fn dependencies(&self) -> Vec<&'static str>;
 }
 
 #[cfg(test)]
