@@ -50,7 +50,7 @@ impl IRepository for Repository {
             .await
             .map_err(|e| format!("{:?}", e))?;
         let data = from_row::<DbData>(row).map_err(|e| format!("{}", e))?;
-        Ok(data.into())
+        Ok(data)
     }
 
     async fn get_all(&self) -> Result<Vec<DbData>, String> {

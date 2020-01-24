@@ -629,7 +629,10 @@ impl ContainerBuilder {
         #[cfg(feature = "debug")]
         let mut deps = vec![];
         self.provider_map.insert(
-            key.clone(),
+            #[cfg(feature = "debug")]
+            { key.clone() },
+            #[cfg(not(feature = "debug"))]
+            { key },
             provider.map(|p| {
                 #[cfg(feature = "debug")]
                 { deps = p.dependencies(); }
