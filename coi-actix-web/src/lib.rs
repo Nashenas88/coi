@@ -11,17 +11,24 @@ use actix_web::{
 use coi::{Container, Inject};
 use futures::future::{err, ok, ready, Ready};
 use std::{
+    marker::PhantomData,
     sync::{Arc, Mutex},
 };
 
-pub trait ContainerKey<T>: Default
+pub trait ContainerKey<T>
 where
     T: Inject + ?Sized,
 {
     const KEY: &'static str;
 }
 
-pub struct Injected<T, K>(pub T, pub K);
+pub struct Injected<T, K>(pub T, pub PhantomData<K>);
+
+impl<T, K> Injected<T, K> {
+    pub fn new(injected: T) -> Self {
+        Self(injected, PhantomData)
+    }
+}
 
 impl<T, K> FromRequest for Injected<Arc<T>, K>
 where
@@ -38,7 +45,7 @@ where
                 Container::scopable(Arc::clone(container))
                     .scoped()
                     .resolve::<T>(K::KEY)
-                    .map(|t| Injected(t, K::default()))
+                    .map(|t| Injected::new(t))
                     .map_err(|e| {
                         log::error!("{}", e);
                         ErrorInternalServerError("huh")
@@ -68,7 +75,7 @@ macro_rules! injected_tuples {
                 match req.app_data::<Arc<Mutex<Container>>>() {
                     Some(container) => {
                         let mut container = Container::scopable(Arc::clone(&container)).scoped();
-                        ok(Injected(($(
+                        ok(Injected::new(($(
                             {
                                 let resolved = container
                                     .resolve::<$T>(<$K as ContainerKey<$T>>::KEY)
@@ -78,8 +85,7 @@ macro_rules! injected_tuples {
                                     Err(e) => return err(e),
                                 }
                             },
-                        )+),
-                        ($(<$K as Default>::default(),)+)))
+                        )+)))
                     },
                     None => err(ErrorInternalServerError("Container not registered"))
                 }
