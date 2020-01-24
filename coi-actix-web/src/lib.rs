@@ -45,7 +45,7 @@ where
                 Container::scopable(Arc::clone(container))
                     .scoped()
                     .resolve::<T>(K::KEY)
-                    .map(|t| Injected::new(t))
+                    .map(Injected::new)
                     .map_err(|e| {
                         log::error!("{}", e);
                         ErrorInternalServerError("huh")
