@@ -11,3 +11,5 @@ members = [
 
 [patch.crates-io]
 coi = { path = "coi", version = "0.6.1" }
+coi-derive = { path = "coi-derive" }
+coi-actix-web = { path = "coi-actix-web" }

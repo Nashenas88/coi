@@ -44,7 +44,7 @@ pub struct JustAStruct;
 
 #[test]
 fn main() {
-    let mut container = container! {
+    let container = container! {
         trait1 => Impl1Provider,
         trait2 => Impl2Provider,
         struct => JustAStructProvider
@@ -62,7 +62,7 @@ fn main() {
 #[test]
 fn can_send_through_threads() {
     use std::sync::Mutex;
-    let mut container = container! {
+    let container = container! {
         trait1 => Impl1Provider,
     };
     let _trait1 = container

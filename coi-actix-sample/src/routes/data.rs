@@ -1,7 +1,4 @@
-use crate::{
-    dtos::data::DataDto,
-    services::service::IService,
-};
+use crate::{dtos::data::DataDto, services::service::IService};
 use actix_web::{
     web::{self, HttpResponse, ServiceConfig},
     Responder,

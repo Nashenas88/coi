@@ -44,7 +44,7 @@ where
 {
     type Output = PostgresPool<T>;
 
-    fn provide(&self, _: &mut Container) -> Result<Arc<PostgresPool<T>>, Error> {
+    fn provide(&self, _: &Container) -> Result<Arc<PostgresPool<T>>, Error> {
         Ok(Arc::new(PostgresPool(self.0.clone())))
     }
 }

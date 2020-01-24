@@ -37,7 +37,7 @@
 //!
 //! ```rust
 //! # use coi::{Container, Inject, Provide};
-//! # use std::sync::Arc;
+//! # use std::sync::{Arc, RwLock};
 //! # trait Trait1: Inject {}
 //! #
 //! trait Dependency: Inject {}
@@ -61,7 +61,7 @@
 //! impl Provide for Trait1Provider {
 //!     type Output = dyn Trait1;
 //!
-//!     fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
+//!     fn provide(&self, container: &Container) -> coi::Result<Arc<Self::Output>> {
 //!         let dependency = container.resolve::<dyn Dependency>("dependency")?;
 //!         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //!     }
@@ -92,7 +92,7 @@
 //! #
 //! # impl Provide for Trait1Provider {
 //! #     type Output = dyn Trait1;
-//! #     fn provide(&self, container: &mut Container) -> coi::Result<Arc<Self::Output>> {
+//! #     fn provide(&self, container: &Container) -> coi::Result<Arc<Self::Output>> {
 //! #         let dependency = container.resolve::<dyn Dependency>("dependency")?;
 //! #         Ok(Arc::new(Impl1::new(dependency)) as Arc<dyn Trait1>)
 //! #     }
@@ -108,7 +108,7 @@
 //! impl Provide for DependencyProvider {
 //!     type Output = dyn Dependency;
 //!
-//!     fn provide(&self, _: &mut Container) -> coi::Result<Arc<Self::Output>> {
+//!     fn provide(&self, _: &Container) -> coi::Result<Arc<Self::Output>> {
 //!         Ok(Arc::new(DepImpl) as Arc<dyn Dependency>)
 //!     }
 //! }
@@ -287,7 +287,7 @@
 
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 #[cfg(any(feature = "derive", feature = "debug"))]
 pub use coi_derive::*;
@@ -356,15 +356,15 @@ pub enum RegistrationKind {
     ///
     /// # Example
     /// ```rust
-    /// # use coi::{container, Container, Inject, Result};
-    /// # use std::{ops::Deref, sync::{Arc, Mutex}};
+    /// # use coi::{container, Inject, Result};
+    /// # use std::{ops::Deref, sync::{Arc, RwLock}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
-    /// let mut container = container! {
+    /// let container = container! {
     ///     trait => ImplProvider.scoped
     /// };
     ///
@@ -376,7 +376,7 @@ pub enum RegistrationKind {
     ///     instance_2.deref() as &dyn Trait as *const _
     /// );
     /// {
-    ///     let mut scoped = Container::scopable(Arc::new(Mutex::new(container))).scoped();
+    ///     let scoped = container.scoped();
     ///     let instance_3 = scoped.resolve::<dyn Trait>("trait")?;
     ///
     ///     // Since these two were resolved in different scopes, they will never be the
@@ -396,15 +396,15 @@ pub enum RegistrationKind {
     ///
     /// # Example
     /// ```rust
-    /// # use coi::{container, Container, Inject, Result};
-    /// # use std::{ops::Deref, sync::{Arc, Mutex}};
+    /// # use coi::{container, Inject, Result};
+    /// # use std::{ops::Deref, sync::{Arc, RwLock}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
-    /// let mut container = container! {
+    /// let container = container! {
     ///     trait => ImplProvider.singleton
     /// };
     ///
@@ -416,7 +416,7 @@ pub enum RegistrationKind {
     ///     instance_2.deref() as &dyn Trait as *const _
     /// );
     /// {
-    ///     let mut scoped = Container::scopable(Arc::new(Mutex::new(container))).scoped();
+    ///     let scoped = container.scoped();
     ///     let instance_3 = scoped.resolve::<dyn Trait>("trait")?;
     ///
     ///     // Regardless of what scope the instance was resolved it, it will always
@@ -447,57 +447,86 @@ impl<T> Registration<T> {
 
 /// A struct that manages all injected types.
 #[derive(Clone, Debug)]
-pub struct Container {
+struct InnerContainer {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
     resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
-    parent: Option<Arc<Mutex<Container>>>,
+    parent: Option<Container>,
     #[cfg(feature = "debug")]
     dependency_map: HashMap<String, Vec<&'static str>>,
 }
 
-impl Container {
-    /// Construct or lookup a previously constructed object of type `T` with key `key`.
-    pub fn resolve<T>(&mut self, key: &str) -> Result<Arc<T>>
+impl InnerContainer {
+    fn check_resolved<T>(&self, key: &str) -> Option<Result<Arc<T>>>
     where
         T: Inject + ?Sized,
     {
-        // If we already have a resolved version, return it.
-        if self.resolved_map.contains_key(key) {
-            return self
-                .resolved_map
-                .get(key)
-                .unwrap()
-                .downcast_ref::<Arc<T>>()
+        self.resolved_map.get(key).map(|v| {
+            v.downcast_ref::<Arc<T>>()
                 .map(Arc::clone)
-                .ok_or_else(|| Error::TypeMismatch(key.to_owned()));
-        }
+                .ok_or_else(|| Error::TypeMismatch(key.to_owned()))
+        })
+    }
+}
 
-        // Try to find the provider
-        let registration = match self.provider_map.get(key) {
-            Some(provider) => provider,
-            None => {
-                // If the key is not found, then we might be a child container. If we have a
-                // parent, then search it for a possibly valid provider.
-                return match &self.parent {
-                    Some(parent) => parent.lock().unwrap().resolve::<T>(key),
-                    None => Err(Error::KeyNotFound(key.to_owned())),
-                };
+#[derive(Clone, Debug)]
+pub struct Container(Arc<RwLock<InnerContainer>>);
+
+impl Container {
+    fn new(container: InnerContainer) -> Self {
+        Self(Arc::new(RwLock::new(container)))
+    }
+
+    pub fn resolve<T>(&self, key: &str) -> Result<Arc<T>>
+    where
+        T: Inject + ?Sized,
+    {
+        let (kind, provider) = {
+            let container = self.0.read().unwrap();
+            // If we already have a resolved version, return it.
+            if let Some(resolved) = container.check_resolved::<T>(key) {
+                return resolved;
             }
-        };
 
-        let kind = registration.kind;
-        let provided = registration
-            .provider
-            .downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
-            .map(Arc::clone)
-            .ok_or_else(|| Error::TypeMismatch(key.to_owned()))?
-            .provide(self);
+            // Try to find the provider
+            let registration = match container.provider_map.get(key) {
+                Some(provider) => provider,
+                None => {
+                    // If the key is not found, then we might be a child container. If we have a
+                    // parent, then search it for a possibly valid provider.
+                    return match &container.parent {
+                        Some(parent) => {
+                            let parent = parent.clone();
+                            // Release the lock so we don't deadlock, this container isn't
+                            // needed anymore
+                            drop(container);
+                            parent.resolve::<T>(key)
+                        }
+                        None => Err(Error::KeyNotFound(key.to_owned())),
+                    };
+                }
+            };
+
+            (
+                registration.kind,
+                registration
+                    .provider
+                    .downcast_ref::<Arc<dyn Provide<Output = T> + Send + Sync + 'static>>()
+                    .map(Arc::clone)
+                    .ok_or_else(|| Error::TypeMismatch(key.to_owned()))?,
+            )
+        };
+        let provided = provider.provide(self);
 
         match kind {
             RegistrationKind::Transient => provided,
             RegistrationKind::Scoped | RegistrationKind::Singleton => {
-                self.resolved_map.insert(key.to_owned(), Arc::new(provided?));
-                Ok(self.resolved_map[key]
+                let mut container = self.0.write().unwrap();
+                // Since there's a possibility for a deadlock right now, we want to make sure
+                // no one else already inserted into the resolved map (hence the call to entry).
+                Ok(container
+                    .resolved_map
+                    .entry(key.to_owned())
+                    .or_insert(Arc::new(provided?))
                     .downcast_ref::<Arc<T>>()
                     .map(Arc::clone)
                     .unwrap())
@@ -505,37 +534,12 @@ impl Container {
         }
     }
 
-    /// Produce an object that can be converted into a scoped container.
-    /// ```rust
-    /// # use coi::{container, Container, Inject};
-    /// # use std::sync::{Arc, Mutex};
-    /// # trait Trait : Inject {}
-    /// # #[derive(Inject)]
-    /// # #[provides(dyn Trait with Impl)]
-    /// # struct Impl;
-    /// # impl Trait for Impl {}
-    /// let mut container = container! {
-    ///     trait => ImplProvider.scoped
-    /// };
-    /// let mut scoped_container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    /// ```
-    pub fn scopable(container: Arc<Mutex<Self>>) -> Scopable {
-        Scopable(container)
-    }
-}
-
-/// An intermediary struct used to construct a scoped container. See [`Container::scopable`]
-///
-/// [`Container::scopable`]: struct.Container.html#method.scopable
-pub struct Scopable(Arc<Mutex<Container>>);
-
-impl Scopable {
     /// Produce a child container that only contains providers for scoped registrations
     /// Any calls to resolve from the returned container can still use the `self` container
     /// to resolve any other kinds of registrations.
     pub fn scoped(&self) -> Container {
-        let container: &Container = &self.0.lock().unwrap();
-        Container {
+        let container: &InnerContainer = &self.0.read().unwrap();
+        Container::new(InnerContainer {
             provider_map: container
                 .provider_map
                 .iter()
@@ -554,8 +558,8 @@ impl Scopable {
             // FIXME(pfaria) no clone here
             #[cfg(feature = "debug")]
             dependency_map: container.dependency_map.clone(),
-            parent: Some(Arc::clone(&self.0)),
-        }
+            parent: Some(self.clone()),
+        })
     }
 }
 
@@ -632,13 +636,13 @@ impl ContainerBuilder {
 
     /// Consume this builder to produce a `Container`.
     pub fn build(self) -> Container {
-        Container {
+        Container::new(InnerContainer {
             provider_map: self.provider_map,
             resolved_map: HashMap::new(),
             parent: None,
             #[cfg(feature = "debug")]
             dependency_map: self.dependency_map,
-        }
+        })
     }
 }
 
@@ -648,7 +652,7 @@ pub trait Provide {
     type Output: Inject + ?Sized;
 
     /// Only intended to be used internally
-    fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>>;
+    fn provide(&self, container: &Container) -> Result<Arc<Self::Output>>;
 
     /// Return list of dependencies
     #[cfg(feature = "debug")]

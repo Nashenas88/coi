@@ -74,7 +74,7 @@ impl Parse for InjectableField {
 /// Given a field `<field_name>: <field_ty>`, this attribute will cause the following resolution to
 /// be generated:
 /// ```rust,ignore
-/// let <field_name> = container.resolve::<<field_ty>>("<field_name>");
+/// let <field_name> = Container::resolve::<<field_ty>>(conainer, "<field_name>");
 /// ```
 /// Because of this, it's important that the field name MUST match the string that's used to
 /// register the provider in the `ContainerBuilder`.
@@ -283,7 +283,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
             fn provide(
                 &self,
-                #container: &mut ::coi::Container,
+                #container: &::coi::Container,
             ) -> ::coi::Result<::std::sync::Arc<Self::Output>> {
                 #( #resolve )*
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)

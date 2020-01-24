@@ -14,7 +14,7 @@ struct Impl1Provider;
 impl Provide for Impl1Provider {
     type Output = dyn Trait1;
 
-    fn provide(&self, _: &mut Container) -> Result<Arc<Self::Output>> {
+    fn provide(&self, _: &Container) -> Result<Arc<Self::Output>> {
         Ok(Arc::new(Impl1) as Arc<dyn Trait1>)
     }
 }
@@ -40,7 +40,7 @@ struct Impl2Provider;
 impl Provide for Impl2Provider {
     type Output = dyn Trait2;
 
-    fn provide(&self, container: &mut Container) -> Result<Arc<Self::Output>> {
+    fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
         let trait1 = container.resolve::<dyn Trait1>("trait1")?;
         Ok(Arc::new(Impl2::new(trait1)) as Arc<dyn Trait2>)
     }
@@ -67,14 +67,14 @@ struct JustAStructProvider;
 impl Provide for JustAStructProvider {
     type Output = JustAStruct;
 
-    fn provide(&self, _: &mut Container) -> Result<Arc<Self::Output>> {
+    fn provide(&self, _: &Container) -> Result<Arc<Self::Output>> {
         Ok(Arc::new(JustAStruct))
     }
 }
 
 #[test]
 fn main() {
-    let mut container = container! {
+    let container = container! {
         trait1 => Impl1Provider,
         trait2 => Impl2Provider
     };

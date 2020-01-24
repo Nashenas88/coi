@@ -10,10 +10,7 @@ use actix_web::{
 };
 use coi::{Container, Inject};
 use futures::future::{err, ok, ready, Ready};
-use std::{
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-};
+use std::{marker::PhantomData, sync::Arc};
 
 pub trait ContainerKey<T>
 where
@@ -40,17 +37,19 @@ where
     type Config = ();
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        match req.app_data::<Arc<Mutex<Container>>>() {
-            Some(container) => ready(
-                Container::scopable(Arc::clone(container))
-                    .scoped()
-                    .resolve::<T>(K::KEY)
-                    .map(Injected::new)
-                    .map_err(|e| {
-                        log::error!("{}", e);
-                        ErrorInternalServerError("huh")
-                    }),
-            ),
+        match req.app_data::<Container>() {
+            Some(container) => {
+                let container = container.scoped();
+                ready(
+                    container
+                        .resolve::<T>(K::KEY)
+                        .map(Injected::new)
+                        .map_err(|e| {
+                            log::error!("{}", e);
+                            ErrorInternalServerError("huh")
+                        }),
+                )
+            }
             None => {
                 log::error!("Container not registered");
                 err(ErrorInternalServerError("huh2"))
@@ -72,13 +71,12 @@ macro_rules! injected_tuples {
             type Config = ();
 
             fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-                match req.app_data::<Arc<Mutex<Container>>>() {
+                match req.app_data::<Container>() {
                     Some(container) => {
-                        let mut container = Container::scopable(Arc::clone(&container)).scoped();
+                        let container = container.scoped();
                         ok(Injected::new(($(
                             {
-                                let resolved = container
-                                    .resolve::<$T>(<$K as ContainerKey<$T>>::KEY)
+                                let resolved = container.resolve::<$T>(<$K as ContainerKey<$T>>::KEY)
                                     .map_err(ErrorInternalServerError);
                                 match resolved {
                                     Ok(r) => r,

@@ -5,7 +5,7 @@ use crate::{
 use actix_web::{middleware, App, HttpServer};
 use coi::container;
 use mobc_postgres::{mobc::Pool, tokio_postgres::NoTls, PgConnectionManager};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 mod dtos;
 mod models;
@@ -26,7 +26,7 @@ async fn main() -> Result<(), String> {
     let pool = Pool::builder().max_open(20).build(manager);
     let pool_provider = PostgresPoolProvider::new(pool);
 
-    let container = Arc::new(Mutex::new(container! {
+    let container = Arc::new(RwLock::new(container! {
         pool => pool_provider.singleton,
         service => ServiceProvider.scoped,
         repository => RepositoryProvider.scoped,
