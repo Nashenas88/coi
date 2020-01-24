@@ -9,7 +9,6 @@ use actix_web::{
 use coi_actix_web::{ContainerKey, Injected};
 use std::sync::Arc;
 
-#[derive(Default)]
 struct ServiceKey;
 impl ContainerKey<dyn IService> for ServiceKey {
     const KEY: &'static str = "service";
@@ -17,14 +16,14 @@ impl ContainerKey<dyn IService> for ServiceKey {
 
 async fn get(
     id: web::Path<i64>,
-    Injected(service, _): Injected<Arc<dyn IService>, ServiceKey>,
+    Injected(service, ..): Injected<Arc<dyn IService>, ServiceKey>,
 ) -> Result<impl Responder, ()> {
     let name = service.get(*id).await.map_err(|e| log::error!("{}", e))?;
     Ok(HttpResponse::Ok().json(DataDto::from(name)))
 }
 
 async fn get_all(
-    Injected(service, _): Injected<Arc<dyn IService>, ServiceKey>,
+    Injected(service, ..): Injected<Arc<dyn IService>, ServiceKey>,
 ) -> Result<impl Responder, ()> {
     let data = service.get_all().await.map_err(|e| log::error!("{}", e))?;
     Ok(HttpResponse::Ok().json(data.into_iter().map(DataDto::from).collect::<Vec<_>>()))
