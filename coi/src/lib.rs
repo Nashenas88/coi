@@ -373,8 +373,8 @@ pub enum Registration<T> {
     ///
     /// # Example
     /// ```rust
-    /// # use coi::{container, Inject, Result};
-    /// # use std::ops::Deref;
+    /// # use coi::{container, Container, Inject, Result};
+    /// # use std::{ops::Deref, sync::{Arc, Mutex}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
@@ -393,7 +393,7 @@ pub enum Registration<T> {
     ///     instance_2.deref() as &dyn Trait as *const _
     /// );
     /// {
-    ///     let mut scoped = container.scopable().scoped();
+    ///     let mut scoped = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     ///     let instance_3 = scoped.resolve::<dyn Trait>("trait")?;
     ///
     ///     // Since these two were resolved in different scopes, they will never be the
@@ -413,8 +413,8 @@ pub enum Registration<T> {
     ///
     /// # Example
     /// ```rust
-    /// # use coi::{container, Inject, Result};
-    /// # use std::ops::Deref;
+    /// # use coi::{container, Container, Inject, Result};
+    /// # use std::{ops::Deref, sync::{Arc, Mutex}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
@@ -433,7 +433,7 @@ pub enum Registration<T> {
     ///     instance_2.deref() as &dyn Trait as *const _
     /// );
     /// {
-    ///     let mut scoped = container.scopable().scoped();
+    ///     let mut scoped = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     ///     let instance_3 = scoped.resolve::<dyn Trait>("trait")?;
     ///
     ///     // Regardless of what scope the instance was resolved it, it will always
@@ -532,7 +532,8 @@ impl Container {
 
     /// Produce an object that can be converted into a scoped container.
     /// ```rust
-    /// # use coi::{container, Inject};
+    /// # use coi::{container, Container, Inject};
+    /// # use std::sync::{Arc, Mutex};
     /// # trait Trait : Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
@@ -541,7 +542,7 @@ impl Container {
     /// let mut container = container! {
     ///     trait => ImplProvider.scoped
     /// };
-    /// let mut scoped_container = container.scopable().scoped();
+    /// let mut scoped_container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     /// ```
     pub fn scopable(container: Arc<Mutex<Self>>) -> Scopable {
         Scopable(container)

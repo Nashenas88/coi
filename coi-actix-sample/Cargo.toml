@@ -10,7 +10,7 @@ edition = "2018"
 actix-rt = "1.0.0"
 actix-web = "2.0.0"
 async-trait = "0.1.22"
-coi = { path = "../coi" }
+coi = "0.6.0"
 coi-actix-web = { path = "../coi-actix-web" }
 env_logger = "0.7.1"
 futures = "0.3.1"
