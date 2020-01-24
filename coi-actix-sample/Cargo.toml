@@ -1,0 +1,20 @@
+[package]
+name = "coi-actix-sample"
+version = "0.1.0"
+authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-rt = "1.0.0"
+actix-web = "2.0.0"
+async-trait = "0.1.22"
+coi = { path = "../coi" }
+coi-actix-web = { path = "../coi-actix-web" }
+env_logger = "0.7.1"
+futures = "0.3.1"
+mobc-postgres = "0.5.0"
+serde_tokio_postgres = { git = "https://github.com/githubaccount624/serde_postgres" }
+serde = "1.0.104"
+log = "0.4.8"

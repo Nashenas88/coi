@@ -543,8 +543,8 @@ impl Container {
     /// };
     /// let mut scoped_container = container.scopable().scoped();
     /// ```
-    pub fn scopable(self) -> Scopable {
-        Scopable(Arc::new(Mutex::new(self)))
+    pub fn scopable(container: Arc<Mutex<Self>>) -> Scopable {
+        Scopable(container)
     }
 }
 
