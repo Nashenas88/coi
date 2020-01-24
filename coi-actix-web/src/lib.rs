@@ -1,3 +1,8 @@
+//! (TODO)
+
+// re-export coi for convenience
+pub use coi;
+
 use actix_web::{
     dev::Payload,
     error::{Error, ErrorInternalServerError, Result},

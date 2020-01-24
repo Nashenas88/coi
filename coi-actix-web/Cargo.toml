@@ -3,11 +3,15 @@ name = "coi-actix-web"
 version = "0.1.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Nashenas88/coi"
+description = "coi-actix-web provides integration support between coi and actix-web"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 actix-web = "2.0.0"
-coi = { path = "../coi" }
+coi = "0.6.0"
 futures = "0.3.1"
 log = "0.4.8"

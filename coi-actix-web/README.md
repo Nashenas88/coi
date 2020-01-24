@@ -6,7 +6,11 @@
 
 Dependency Injection in Rust
 
-This crate provides helper macros for the `coi` crate.
+This crate provides integration support between `coi` and `actix-web`.
+
+## Example
+
+(TODO)
 
 #### License
 
