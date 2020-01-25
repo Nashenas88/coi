@@ -1,6 +1,7 @@
 use crate::{
     models::data::Data,
     postgres::PostgresPool,
+    repositories::error::Error,
 };
 use async_trait::async_trait;
 use coi::Inject;
@@ -26,8 +27,8 @@ impl Into<Data> for DbData {
 
 #[async_trait]
 pub trait IRepository: Inject {
-    async fn get(&self, id: i64) -> Result<DbData, String>;
-    async fn get_all(&self) -> Result<Vec<DbData>, String>;
+    async fn get(&self, id: i64) -> Result<DbData, Error>;
+    async fn get_all(&self) -> Result<Vec<DbData>, Error>;
 }
 
 #[derive(Inject)]
@@ -39,36 +40,32 @@ struct Repository {
 
 #[async_trait]
 impl IRepository for Repository {
-    async fn get(&self, id: i64) -> Result<DbData, String> {
-        let client = self.pool.get().await.map_err(|e| format!("{:?}", e))?;
+    async fn get(&self, id: i64) -> Result<DbData, Error> {
+        let client = self.pool.get().await?;
         let statement = client
             .prepare("SELECT id, name FROM data WHERE id=$1::BIGINT")
-            .await
-            .map_err(|e| format!("{:?}", e))?;
+            .await?;
         let row = client
             .query_one(&statement, &[&id])
-            .await
-            .map_err(|e| format!("{:?}", e))?;
-        let data = from_row::<DbData>(row).map_err(|e| format!("{}", e))?;
+            .await?;
+        let data = from_row::<DbData>(row)?;
         Ok(data)
     }
 
-    async fn get_all(&self) -> Result<Vec<DbData>, String> {
-        let client = self.pool.get().await.map_err(|e| format!("{:?}", e))?;
+    async fn get_all(&self) -> Result<Vec<DbData>, Error> {
+        let client = self.pool.get().await?;
         let statement = client
             .prepare("SELECT id, name FROM data LIMIT 50")
-            .await
-            .map_err(|e| format!("{:?}", e))?;
+            .await?;
         let rows = client
             .query(&statement, &[])
-            .await
-            .map_err(|e| format!("{:?}", e))?;
+            .await?;
         let names = rows
             .into_iter()
             .map(|r| {
                 from_row::<DbData>(r)
                     .map(Into::into)
-                    .map_err(|e| format!("{:?}", e))
+                    .map_err(Into::<Error>::into)
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(names)

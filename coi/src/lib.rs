@@ -287,7 +287,6 @@
 
 use std::any::Any;
 use std::collections::HashMap;
-use std::fmt::{self, Display};
 use std::sync::{Arc, Mutex};
 
 #[cfg(any(feature = "derive", feature = "debug"))]
@@ -296,34 +295,18 @@ pub use coi_derive::*;
 use std::fmt::Debug;
 
 /// Errors produced by this crate
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// This key was not found in the container. Either the requested resource was never registered
     /// with this container, or there is a typo in the register or resolve calls.
+    #[error("Key not found: {0}")]
     KeyNotFound(String),
     /// The requested key was found in the container, but its type did not match the requested type.
+    #[error("Type mismatch for key: {0}")]
     TypeMismatch(String),
     /// Wrapper around errors produced by `Provider`s.
-    Inner(Box<dyn std::error::Error + Send + Sync + 'static>),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
-        match self {
-            Error::KeyNotFound(s) => write!(f, "Key not found: {}", s),
-            Error::TypeMismatch(s) => write!(f, "Type mismatch for key: {}", s),
-            Error::Inner(ptr) => write!(f, "Inner error: {}", ptr),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::KeyNotFound(_) | Error::TypeMismatch(_) => None,
-            Error::Inner(ptr) => Some(ptr.as_ref()),
-        }
-    }
+    #[error("Inner error: {0}")]
+    Inner(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
 /// Type alias to `Result<T, coi::Error>`.
