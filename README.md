@@ -60,11 +60,13 @@ pub struct JustAStruct;
 
 fn main() {
     task::block_on(async {
+        // A container can be built with a macro...
         let mut container = container!{
             trait1 => Impl1,
             trait2 => Impl2.scoped,
             struct => JustAStruct.singleton
         };
+        // or by using the builder pattern.
         let mut container = ContainerBuilder::new()
             .register("trait1", Impl1Provider)
             .register_as("trait2", Registration::Scoped(Impl2Provider))
