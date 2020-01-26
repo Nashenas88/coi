@@ -246,79 +246,79 @@ macro_rules! make_wide_container {
 #[bench]
 fn deeply_nested_transient_dependencies(b: &mut Bencher) {
     let mut container = make_deep_container!();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
 fn deeply_nested_singleton_dependencies(b: &mut Bencher) {
     let mut container = make_deep_container!(singleton);
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
 fn deeply_nested_scoped_dependencies(b: &mut Bencher) {
     let mut container = make_deep_container!(scoped);
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
 fn wide_transient_dependencies(b: &mut Bencher) {
     let mut container = make_wide_container!();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
 fn wide_singleton_dependencies(b: &mut Bencher) {
     let mut container = make_wide_container!(singleton);
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
 fn wide_scoped_dependencies(b: &mut Bencher) {
     let mut container = make_wide_container!(scoped);
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
 fn scoped_container_deeply_nested_transient_dependencies(b: &mut Bencher) {
     let container = make_deep_container!();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
 fn scoped_container_deeply_nested_singleton_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(singleton);
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
 fn scoped_container_deeply_nested_scoped_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(scoped);
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
 fn scoped_container_wide_transient_dependencies(b: &mut Bencher) {
     let container = make_wide_container!();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
 fn scoped_container_wide_singleton_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(singleton);
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
 fn scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(scoped);
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
@@ -326,7 +326,7 @@ fn doubly_scoped_container_deeply_nested_transient_dependencies(b: &mut Bencher)
     let container = make_deep_container!();
     let container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
@@ -334,7 +334,7 @@ fn doubly_scoped_container_deeply_nested_singleton_dependencies(b: &mut Bencher)
     let container = make_deep_container!(singleton);
     let container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
@@ -342,7 +342,7 @@ fn doubly_scoped_container_deeply_nested_scoped_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(scoped);
     let container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1"));
+    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
 }
 
 #[bench]
@@ -350,7 +350,7 @@ fn doubly_scoped_container_wide_transient_dependencies(b: &mut Bencher) {
     let container = make_wide_container!();
     let container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
@@ -358,7 +358,7 @@ fn doubly_scoped_container_wide_singleton_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(singleton);
     let container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 #[bench]
@@ -366,7 +366,7 @@ fn doubly_scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(scoped);
     let container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
     let mut container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1"));
+    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
 }
 
 macro_rules! make_dep {
@@ -408,7 +408,7 @@ make_dep!(ID15, D15, [d16 => ID16]);
 make_dep!(ID16, D16, [d17 => ID17]);
 make_dep!(ID17, D17, [d18 => ID18]);
 make_dep!(ID18, D18, [d19 => ID19]);
-make_dep!(ID19, D19, [d20 => ID10]);
+make_dep!(ID19, D19, [d20 => ID20]);
 make_dep!(ID20, D20, [d21 => ID21]);
 make_dep!(ID21, D21, [d22 => ID22]);
 make_dep!(ID22, D22, [d23 => ID23]);
