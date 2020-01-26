@@ -1,8 +1,8 @@
 # coi-derive
 
 [![Build Status](https://travis-ci.org/Nashenas88/coi.svg?branch=master)](https://travis-ci.org/Nashenas88/coi)
-[![docs.rs](https://docs.rs/coi-derive/badge.svg)](https://docs.rs/coi)
-[![crates.io](https://img.shields.io/crates/v/coi-derive.svg)](https://crates.io/crates/coi)
+[![docs.rs](https://docs.rs/coi-actix-web/badge.svg)](https://docs.rs/coi-actix-web)
+[![crates.io](https://img.shields.io/crates/v/coi-actix-web.svg)](https://crates.io/crates/coi-actix-web)
 
 Dependency Injection in Rust
 
