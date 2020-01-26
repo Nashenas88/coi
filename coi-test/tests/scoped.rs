@@ -146,7 +146,7 @@ impl UniqueProvider {
 impl Provide for UniqueProvider {
     type Output = dyn Id;
 
-    fn provide(&self, _: &mut Container) -> coi::Result<Arc<Self::Output>> {
+    fn provide(&self, _: &Container) -> coi::Result<Arc<Self::Output>> {
         let count = self.count.fetch_add(1, Ordering::Relaxed);
         Ok(Arc::new(Unique { id: count }) as Arc<dyn Id>)
     }
@@ -208,7 +208,7 @@ fn scoped_registration_provides_same_instance_regardless_of_nesting_order() {
         hold => HolderProvider.transient,
         dep3 => Impl3Provider.scoped,
     };
-    let mut scoped_container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
+    let scoped_container = container.scoped();
     let dep3 = scoped_container.resolve::<dyn Dep3>("dep3").unwrap();
     let (id1, id2) = dep3.get_ids();
     assert_eq!(
