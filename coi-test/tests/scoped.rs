@@ -1,7 +1,10 @@
-use coi::{container, Container, Inject};
+use coi::{container, Container, Inject, Provide};
 use std::{
     ops::Deref,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
 trait Dep1: Inject {}
@@ -128,4 +131,106 @@ fn scoped_registration_always_returns_same_instance_within_same_scope() {
             dep2_3.deref() as &dyn Dep2 as *const _
         );
     }
+}
+
+trait Id: Inject {
+    fn id(&self) -> usize;
+}
+
+struct Unique {
+    id: usize,
+}
+
+impl Inject for Unique {}
+
+impl Id for Unique {
+    fn id(&self) -> usize {
+        self.id
+    }
+}
+
+struct UniqueProvider {
+    count: AtomicUsize,
+}
+
+impl UniqueProvider {
+    fn new() -> Self {
+        Self {
+            count: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl Provide for UniqueProvider {
+    type Output = dyn Id;
+
+    fn provide(&self, _: &mut Container) -> coi::Result<Arc<Self::Output>> {
+        let count = self.count.fetch_add(1, Ordering::Relaxed);
+        Ok(Arc::new(Unique { id: count }) as Arc<dyn Id>)
+    }
+}
+
+trait Hold: Inject {
+    fn get_id(&self) -> usize;
+}
+
+#[derive(Inject)]
+#[provides(dyn Hold with Holder::new(id))]
+struct Holder {
+    #[inject]
+    id: Arc<dyn Id>,
+}
+
+impl Holder {
+    fn new(id: Arc<dyn Id>) -> Self {
+        Self { id }
+    }
+}
+
+impl Hold for Holder {
+    fn get_id(&self) -> usize {
+        self.id.id()
+    }
+}
+
+trait Dep3: Inject {
+    fn get_ids(&self) -> (usize, usize);
+}
+
+#[derive(Inject)]
+#[provides(dyn Dep3 with Impl3::new(id, hold))]
+struct Impl3 {
+    #[inject]
+    id: Arc<dyn Id>,
+    #[inject]
+    hold: Arc<dyn Hold>,
+}
+
+impl Impl3 {
+    fn new(id: Arc<dyn Id>, hold: Arc<dyn Hold>) -> Self {
+        Self { id, hold }
+    }
+}
+
+impl Dep3 for Impl3 {
+    fn get_ids(&self) -> (usize, usize) {
+        (self.id.id(), self.hold.get_id())
+    }
+}
+
+#[test]
+fn scoped_registration_provides_same_instance_regardless_of_nesting_order() {
+    let unique_provider = UniqueProvider::new();
+    let container = container! {
+        id => unique_provider.scoped,
+        hold => HolderProvider.transient,
+        dep3 => Impl3Provider.scoped,
+    };
+    let mut scoped_container = Container::scopable(Arc::new(Mutex::new(container))).scoped();
+    let dep3 = scoped_container.resolve::<dyn Dep3>("dep3").unwrap();
+    let (id1, id2) = dep3.get_ids();
+    assert_eq!(
+        id1, id2,
+        "If the ids are different, they were resolved in different scopes!"
+    );
 }
