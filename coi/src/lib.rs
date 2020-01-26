@@ -652,54 +652,6 @@ pub trait Provide {
     fn dependencies(&self) -> Vec<&'static str>;
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn ensure_display() {
-        use std::io;
-
-        let error = Error::KeyNotFound("S".to_owned());
-        let displayed = format!("{}", error);
-        assert_eq!(displayed, "Key not found: S");
-
-        let error = Error::TypeMismatch("S2".to_owned());
-        let displayed = format!("{}", error);
-        assert_eq!(displayed, "Type mismatch for key: S2");
-
-        let error = Error::Inner(Box::new(io::Error::new(io::ErrorKind::NotFound, "oh no!")));
-        let displayed = format!("{}", error);
-        assert_eq!(displayed, "Inner error: oh no!");
-    }
-
-    #[test]
-    fn ensure_debug() {
-        let error = Error::KeyNotFound("S".to_owned());
-        let debugged = format!("{:?}", error);
-        assert_eq!(debugged, "KeyNotFound(\"S\")");
-
-        let error = Error::TypeMismatch("S2".to_owned());
-        let debugged = format!("{:?}", error);
-        assert_eq!(debugged, "TypeMismatch(\"S2\")");
-    }
-
-    #[test]
-    fn conainer_builder_is_clonable() {
-        let builder = ContainerBuilder::new();
-        for _ in 0..2 {
-            let builder = builder.clone();
-            let _container = builder.build();
-        }
-    }
-
-    #[test]
-    fn container_is_clonable() {
-        let container = ContainerBuilder::new().build();
-        let _container = container.clone();
-    }
-}
-
 /// A macro to simplify building of `Container`s.
 ///
 /// It takes a list of key-value pairs, where the keys are converted to string
@@ -753,5 +705,53 @@ macro_rules! container {
             $(container!(@line builder $key $provider $($call)?);)+
             builder.build()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn ensure_display() {
+        use std::io;
+
+        let error = Error::KeyNotFound("S".to_owned());
+        let displayed = format!("{}", error);
+        assert_eq!(displayed, "Key not found: S");
+
+        let error = Error::TypeMismatch("S2".to_owned());
+        let displayed = format!("{}", error);
+        assert_eq!(displayed, "Type mismatch for key: S2");
+
+        let error = Error::Inner(Box::new(io::Error::new(io::ErrorKind::NotFound, "oh no!")));
+        let displayed = format!("{}", error);
+        assert_eq!(displayed, "Inner error: oh no!");
+    }
+
+    #[test]
+    fn ensure_debug() {
+        let error = Error::KeyNotFound("S".to_owned());
+        let debugged = format!("{:?}", error);
+        assert_eq!(debugged, "KeyNotFound(\"S\")");
+
+        let error = Error::TypeMismatch("S2".to_owned());
+        let debugged = format!("{:?}", error);
+        assert_eq!(debugged, "TypeMismatch(\"S2\")");
+    }
+
+    #[test]
+    fn conainer_builder_is_clonable() {
+        let builder = ContainerBuilder::new();
+        for _ in 0..2 {
+            let builder = builder.clone();
+            let _container = builder.build();
+        }
+    }
+
+    #[test]
+    fn container_is_clonable() {
+        let container = ContainerBuilder::new().build();
+        let _container = container.clone();
     }
 }
