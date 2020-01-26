@@ -3,6 +3,9 @@ name = "coi-actix-sample"
 version = "0.1.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Nashenas88/coi"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,7 +13,7 @@ edition = "2018"
 actix-rt = "1.0.0"
 actix-web = "2.0.0"
 async-trait = "0.1.22"
-coi = "0.6.0"
+coi = "0.6.1"
 coi-actix-web = "0.2.0"
 env_logger = "0.7.1"
 futures = "0.3.1"

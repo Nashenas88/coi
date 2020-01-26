@@ -8,3 +8,6 @@ members = [
     "coi-test-debug",
     "coi-test-no-derive",
 ]
+
+[patch.crates-io]
+coi = { path = "coi", version = "0.6.1" }
