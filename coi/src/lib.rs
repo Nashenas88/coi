@@ -37,7 +37,7 @@
 //!
 //! ```rust
 //! # use coi::{Container, Inject, Provide};
-//! # use std::sync::{Arc, RwLock};
+//! # use std::sync::{Arc, Mutex};
 //! # trait Trait1: Inject {}
 //! #
 //! trait Dependency: Inject {}
@@ -287,7 +287,7 @@
 
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 #[cfg(any(feature = "derive", feature = "debug"))]
 pub use coi_derive::*;
@@ -357,7 +357,7 @@ pub enum RegistrationKind {
     /// # Example
     /// ```rust
     /// # use coi::{container, Inject, Result};
-    /// # use std::{ops::Deref, sync::{Arc, RwLock}};
+    /// # use std::{ops::Deref, sync::{Arc, Mutex}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
@@ -397,7 +397,7 @@ pub enum RegistrationKind {
     /// # Example
     /// ```rust
     /// # use coi::{container, Inject, Result};
-    /// # use std::{ops::Deref, sync::{Arc, RwLock}};
+    /// # use std::{ops::Deref, sync::{Arc, Mutex}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
     /// # #[provides(dyn Trait with Impl)]
@@ -469,11 +469,11 @@ impl InnerContainer {
 }
 
 #[derive(Clone, Debug)]
-pub struct Container(Arc<RwLock<InnerContainer>>);
+pub struct Container(Arc<Mutex<InnerContainer>>);
 
 impl Container {
     fn new(container: InnerContainer) -> Self {
-        Self(Arc::new(RwLock::new(container)))
+        Self(Arc::new(Mutex::new(container)))
     }
 
     pub fn resolve<T>(&self, key: &str) -> Result<Arc<T>>
@@ -481,7 +481,7 @@ impl Container {
         T: Inject + ?Sized,
     {
         let (kind, provider) = {
-            let container = self.0.read().unwrap();
+            let container = self.0.lock().unwrap();
             // If we already have a resolved version, return it.
             if let Some(resolved) = container.check_resolved::<T>(key) {
                 return resolved;
@@ -498,7 +498,6 @@ impl Container {
                             let parent = parent.clone();
                             // Release the lock so we don't deadlock, this container isn't
                             // needed anymore
-                            drop(container);
                             parent.resolve::<T>(key)
                         }
                         None => Err(Error::KeyNotFound(key.to_owned())),
@@ -520,7 +519,7 @@ impl Container {
         match kind {
             RegistrationKind::Transient => provided,
             RegistrationKind::Scoped | RegistrationKind::Singleton => {
-                let mut container = self.0.write().unwrap();
+                let mut container = self.0.lock().unwrap();
                 // Since there's a possibility for a deadlock right now, we want to make sure
                 // no one else already inserted into the resolved map (hence the call to entry).
                 Ok(container
@@ -538,7 +537,7 @@ impl Container {
     /// Any calls to resolve from the returned container can still use the `self` container
     /// to resolve any other kinds of registrations.
     pub fn scoped(&self) -> Container {
-        let container: &InnerContainer = &self.0.read().unwrap();
+        let container: &InnerContainer = &self.0.lock().unwrap();
         Container::new(InnerContainer {
             provider_map: container
                 .provider_map
