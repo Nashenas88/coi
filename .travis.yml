@@ -1,17 +1,23 @@
-sudo: false
+os: linux
 
 language: rust
+
+before_install:
+  - rustup component add clippy
 
 rust:
   - stable
   - beta
 
 script:
-  - make test
+  - make test EXTRA=--verbose && make clippy EXTRA=--verbose
 
-matrix:
+jobs:
   include:
     - rust: nightly
       script:
-        - make test
+        - make test EXTRA=--verbose
         - cargo update -Z minimal-versions && cargo build
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
