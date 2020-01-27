@@ -14,7 +14,7 @@ on as the crate matures.
 
 ```rust
 use async_std::task;
-use coi::{ContainerBuilder, Inject};
+use coi::{container, Inject};
 use std::sync::Arc;
 
 pub trait Trait1: Inject {
@@ -59,28 +59,19 @@ impl Trait2 for Impl2 {
 pub struct JustAStruct;
 
 fn main() {
-    task::block_on(async {
-        let mut container = container!{
-            trait1 => Impl1,
-            trait2 => Impl2.scoped,
-            struct => JustAStruct.singleton
-        };
-        let mut container = ContainerBuilder::new()
-            .register("trait1", Impl1Provider)
-            .register_as("trait2", Registration::Scoped(Impl2Provider))
-            .register_as("struct", Registration::Singleton(JustAStructProvider))
-            .build();
-        let trait2 = container
-            .resolve::<dyn Trait2>("trait2")
-            .await
-            .expect("Should exist");
-        println!("Deep description: {}", trait2.as_ref().deep_describe());
-        let a_struct = container
-            .resolve::<JustAStruct>("struct")
-            .await
-            .expect("Should exist");
-        println!("Got struct! {:?}", a_struct);
-    });
+    let container = container!{
+        trait1 => Impl1,
+        trait2 => Impl2.scoped,
+        struct => JustAStruct.singleton
+    };
+    let trait2 = container
+        .resolve::<dyn Trait2>("trait2")
+        .expect("Should exist");
+    println!("Deep description: {}", trait2.as_ref().deep_describe());
+    let a_struct = container
+        .resolve::<JustAStruct>("struct")
+        .expect("Should exist");
+    println!("Got struct! {:?}", a_struct);
 }
 ```
 
