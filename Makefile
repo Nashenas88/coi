@@ -4,26 +4,31 @@
 CRATES=$(dir $(wildcard */Cargo.toml))
 
 test:
-	for dir in $(CRATES); do\
+	failed=false; \
+	for dir in $(CRATES); do \
 		echo "$$dir"; \
 		cd "$$dir"; \
-		cargo test $(EXTRA); \
+		cargo test $(EXTRA) || failed=true; \
 		cd ..; \
-	done
+	done; \
+	if [ "$$failed" = "true" ]; then exit 1; fi
 
 check:
+	failed=false; \
 	for dir in $(CRATES); do\
 		echo "$$dir"; \
 		cd "$$dir"; \
-		cargo check $(EXTRA); \
+		cargo check $(EXTRA) || failed=true; \
 		cd ..; \
-	done
+	done; \
+	if [ "$$failed" = "true" ]; then exit 1; fi
 
 clippy:
+	failed=false; \
 	for dir in $(CRATES); do\
 		echo "$$dir"; \
 		cd "$$dir"; \
-		cargo clippy $(EXTRA); \
+		cargo clippy $(EXTRA) || failed=true; \
 		cd ..; \
-	done
-
+	done; \
+	if [ "$$failed" = "true" ]; then exit 1; fi
