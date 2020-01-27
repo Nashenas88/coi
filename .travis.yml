@@ -1,4 +1,4 @@
-sudo: false
+os: linux
 
 language: rust
 
@@ -12,12 +12,12 @@ rust:
 script:
   - make test EXTRA=--verbose && make clippy EXTRA=--verbose
 
-matrix:
+jobs:
   include:
     - rust: nightly
-      allow_failures:
-        - rust: nightly
-      fast_finish: true
       script:
-        - make test
+        - make test EXTRA=--verbose
         - cargo update -Z minimal-versions && cargo build
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
