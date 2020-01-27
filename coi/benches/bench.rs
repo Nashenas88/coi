@@ -7,28 +7,6 @@ use coi::{container, Inject};
 use std::sync::Arc;
 use test::Bencher;
 
-// #[bench]
-// fn wide_dependencies(b: &mut Bencher) {
-
-// }
-
-// #[bench]
-// fn deeply_scoped(b: &mut Bencher) {
-//     let container = container! {
-
-//     };
-//     for _ in 0..1000 {
-//         container = container.scoped();
-//     }
-
-//     b.iter(|| container.resolve::<dyn Bottom>("bottom"));
-// }
-
-// #[bench]
-// fn singleton(b: &mut Bencher) {
-
-// }
-
 macro_rules! make_deep_container {
     ($($scope_type:ident)?) => {
         container! {
