@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(soft_unstable)]
 #![feature(test)]
 extern crate test;
@@ -222,6 +221,21 @@ macro_rules! make_wide_container {
 }
 
 #[bench]
+fn a_simple_resolve(b: &mut Bencher) {
+    trait I: Inject {}
+    #[derive(Inject)]
+    #[provides(dyn I with S)]
+    struct S;
+
+    impl I for S {}
+
+    let container = container! {
+        s => SProvider,
+    };
+    b.iter(|| container.resolve::<dyn I>("s").unwrap());
+}
+
+#[bench]
 fn deeply_nested_transient_dependencies(b: &mut Bencher) {
     let container = make_deep_container!();
     b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
@@ -350,6 +364,7 @@ fn doubly_scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
 macro_rules! make_dep {
     ($trait:ident, $struct:ident, [$($dep_name:ident => $dep_trait:ident),*]) => {
         trait $trait: Inject {}
+        #[allow(dead_code)]
         #[derive(Inject)]
         #[provides(dyn $trait with $struct::new($($dep_name),*))]
         struct $struct {
