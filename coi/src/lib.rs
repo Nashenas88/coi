@@ -543,7 +543,7 @@ impl Container {
                 .provider_map
                 .iter()
                 .filter_map(|(k, v)| match v.kind {
-                    kind @ RegistrationKind::Scoped => Some((
+                    kind @ RegistrationKind::Scoped | kind @ RegistrationKind::Transient => Some((
                         k.clone(),
                         Registration {
                             kind,
