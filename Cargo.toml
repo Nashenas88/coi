@@ -13,3 +13,6 @@ members = [
 coi = { path = "coi", version = "0.6.1" }
 coi-derive = { path = "coi-derive" }
 coi-actix-web = { path = "coi-actix-web" }
+
+[profile.release.build-override]
+opt-level = 0

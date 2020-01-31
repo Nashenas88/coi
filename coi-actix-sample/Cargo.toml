@@ -21,4 +21,8 @@ log = "0.4.8"
 mobc-postgres = "0.5.0"
 serde_tokio_postgres = { git = "https://github.com/githubaccount624/serde_postgres" }
 serde = "1.0.104"
-thiserror = "1.0.9"
+thiserror = "1.0.10"
+
+[features]
+default = []
+debug = ["coi/debug"]

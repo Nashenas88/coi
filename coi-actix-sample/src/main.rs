@@ -5,7 +5,6 @@ use crate::{
 use actix_web::{middleware, App, HttpServer};
 use coi::container;
 use mobc_postgres::{mobc::Pool, tokio_postgres::NoTls, PgConnectionManager};
-use std::sync::{Arc, RwLock};
 
 mod dtos;
 mod models;
@@ -26,15 +25,28 @@ async fn main() -> Result<(), String> {
     let pool = Pool::builder().max_open(20).build(manager);
     let pool_provider = PostgresPoolProvider::new(pool);
 
-    let container = Arc::new(RwLock::new(container! {
+    let container = container! {
         pool => pool_provider.singleton,
         service => ServiceProvider.scoped,
         repository => RepositoryProvider.scoped,
-    }));
+    };
+
+    #[cfg(feature = "debug")]
+    {
+        if let Err(e) = container.analyze() {
+            eprintln!("Misconfigured container: {}", e);
+            return Ok(());
+        }
+
+        use std::fs::File;
+        use std::io::Write;
+        let mut file = File::create("deps.dot").expect("Cannot create dot file");
+        file.write(container.dot_graph().unwrap().as_bytes()).expect("Cannot write graph to dot file");
+    }
 
     HttpServer::new(move || {
         App::new()
-            .app_data(Arc::clone(&container))
+            .app_data(container.clone())
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .configure(routes::data::route_config)

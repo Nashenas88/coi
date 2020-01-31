@@ -292,6 +292,11 @@ use std::sync::{Arc, Mutex};
 #[cfg(any(feature = "derive", feature = "debug"))]
 pub use coi_derive::*;
 #[cfg(feature = "debug")]
+use petgraph::{
+    algo::toposort,
+    graph::{DiGraph, NodeIndex},
+};
+#[cfg(feature = "debug")]
 use std::fmt::Debug;
 
 /// Errors produced by this crate
@@ -471,6 +476,19 @@ impl InnerContainer {
 #[derive(Clone, Debug)]
 pub struct Container(Arc<Mutex<InnerContainer>>);
 
+#[cfg(feature = "debug")]
+#[derive(Debug, thiserror::Error)]
+pub enum AnalysisError {
+    // FIXME(pfaria), it would be better if we could trace the
+    // entire cycle and store a Vec<String> here. Might require
+    // manually calling petgraph::visit::depth_first_search
+    /// There is a cyclic dependency within the container
+    #[error("Cycle detected at node `{0}`")]
+    Cycle(String),
+    #[error("Node `{0}` depends on `{1}`, the latter of which is not registered")]
+    Missing(String, String),
+}
+
 impl Container {
     fn new(container: InnerContainer) -> Self {
         Self(Arc::new(Mutex::new(container)))
@@ -559,6 +577,60 @@ impl Container {
             dependency_map: container.dependency_map.clone(),
             parent: Some(self.clone()),
         })
+    }
+
+    #[cfg(feature = "debug")]
+    fn dependency_graph(&self) -> std::result::Result<DiGraph<String, String>, ()> {
+        let container = self.0.lock().unwrap();
+        let mut graph = DiGraph::<String, String>::new();
+        let key_to_node = container
+            .dependency_map
+            .iter()
+            .map(|(k, _)| -> (&str, NodeIndex) {
+                let n = graph.add_node(k.to_owned());
+                (k, n)
+            })
+            .collect::<HashMap<&str, _>>();
+        for (k, deps) in &container.dependency_map {
+            let kn = key_to_node[k as &str];
+            let edges = deps
+                .iter()
+                .map(|dep| {
+                    // TODO(pfaria) it's possible for dep to not
+                    // be in the hashmap, and we should return an
+                    // error in that case.
+                    let vn = key_to_node[dep];
+                    (kn, vn)
+                })
+                .collect::<Vec<_>>();
+            graph.extend_with_edges(&edges[..]);
+        }
+
+        Ok(graph)
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn analyze(&self) -> std::result::Result<(), AnalysisError> {
+        let graph = self
+            .dependency_graph()
+            .map_err(|_| AnalysisError::Missing(String::from("A"), String::from("B")))?;
+
+        // Do any cycles exist?
+        if let Err(cycle) = toposort(&graph, None) {
+            return Err(AnalysisError::Cycle(graph[cycle.node_id()].clone()));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn dot_graph(&self) -> std::result::Result<String, ()> {
+        use petgraph::dot::{Config, Dot};
+        let graph = self.dependency_graph()?;
+        Ok(format!(
+            "{:?}",
+            Dot::with_config(&graph, &[Config::EdgeNoLabel])
+        ))
     }
 }
 
