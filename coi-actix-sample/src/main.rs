@@ -44,7 +44,8 @@ async fn main() -> Result<(), String> {
         use std::fs::File;
         use std::io::Write;
         let mut file = File::create("deps.dot").expect("Cannot create dot file");
-        file.write(container.dot_graph().as_bytes()).expect("Cannot write graph to dot file");
+        file.write(container.dot_graph().as_bytes())
+            .expect("Cannot write graph to dot file");
     }
 
     HttpServer::new(move || {

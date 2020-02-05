@@ -1,9 +1,9 @@
 use coi::{container, AnalysisError, Inject};
 use std::sync::Arc;
 
-trait Trait1 : Inject {}
-trait Trait2 : Inject {}
-trait Trait3 : Inject {}
+trait Trait1: Inject {}
+trait Trait2: Inject {}
+trait Trait3: Inject {}
 
 #[allow(dead_code)]
 #[derive(Inject)]
@@ -15,7 +15,9 @@ struct Impl1 {
 
 impl Trait1 for Impl1 {}
 impl Impl1 {
-    fn new(t2: Arc<dyn Trait2>) -> Self { Self { t2 } }
+    fn new(t2: Arc<dyn Trait2>) -> Self {
+        Self { t2 }
+    }
 }
 
 #[allow(dead_code)]
@@ -28,7 +30,9 @@ struct Impl2 {
 
 impl Trait2 for Impl2 {}
 impl Impl2 {
-    fn new(t3: Arc<dyn Trait3>) -> Self { Self { t3 } }
+    fn new(t3: Arc<dyn Trait3>) -> Self {
+        Self { t3 }
+    }
 }
 
 #[allow(dead_code)]
@@ -41,7 +45,9 @@ struct Impl3 {
 
 impl Trait3 for Impl3 {}
 impl Impl3 {
-    fn new(t1: Arc<dyn Trait1>) -> Self { Self { t1 } }
+    fn new(t1: Arc<dyn Trait1>) -> Self {
+        Self { t1 }
+    }
 }
 
 #[test]

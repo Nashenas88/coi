@@ -277,7 +277,7 @@
 //! [dependencies]
 //! coi = { version = "...", default-features = false }
 //! ```
-//! 
+//!
 //! Why the #$*%T won't my container work!?
 //!
 //! To turn on debugging features:
