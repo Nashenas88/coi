@@ -34,14 +34,17 @@ async fn main() -> Result<(), String> {
     #[cfg(feature = "debug")]
     {
         if let Err(e) = container.analyze() {
-            eprintln!("Misconfigured container: {}", e);
-            return Ok(());
+            eprintln!("Misconfigured container: [");
+            for e in e {
+                eprintln!("  {}", e);
+            }
+            eprintln!("]");
         }
 
         use std::fs::File;
         use std::io::Write;
         let mut file = File::create("deps.dot").expect("Cannot create dot file");
-        file.write(container.dot_graph().unwrap().as_bytes()).expect("Cannot write graph to dot file");
+        file.write(container.dot_graph().as_bytes()).expect("Cannot write graph to dot file");
     }
 
     HttpServer::new(move || {
