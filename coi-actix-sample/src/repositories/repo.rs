@@ -1,8 +1,4 @@
-use crate::{
-    models::data::Data,
-    postgres::PostgresPool,
-    repositories::error::Error,
-};
+use crate::{models::data::Data, postgres::PostgresPool, repositories::error::Error};
 use async_trait::async_trait;
 use coi::Inject;
 use mobc_postgres::tokio_postgres::NoTls;
@@ -45,21 +41,15 @@ impl IRepository for Repository {
         let statement = client
             .prepare("SELECT id, name FROM data WHERE id=$1::BIGINT")
             .await?;
-        let row = client
-            .query_one(&statement, &[&id])
-            .await?;
+        let row = client.query_one(&statement, &[&id]).await?;
         let data = from_row::<DbData>(row)?;
         Ok(data)
     }
 
     async fn get_all(&self) -> Result<Vec<DbData>, Error> {
         let client = self.pool.get().await?;
-        let statement = client
-            .prepare("SELECT id, name FROM data LIMIT 50")
-            .await?;
-        let rows = client
-            .query(&statement, &[])
-            .await?;
+        let statement = client.prepare("SELECT id, name FROM data LIMIT 50").await?;
+        let rows = client.query(&statement, &[]).await?;
         let names = rows
             .into_iter()
             .map(|r| {

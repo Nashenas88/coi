@@ -47,4 +47,9 @@ where
     fn provide(&self, _: &Container) -> Result<Arc<PostgresPool<T>>, Error> {
         Ok(Arc::new(PostgresPool(self.0.clone())))
     }
+
+    #[cfg(feature = "debug")]
+    fn dependencies(&self) -> Vec<&'static str> {
+        vec![]
+    }
 }

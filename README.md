@@ -13,18 +13,20 @@ on as the crate matures.
 ### Example 
 
 ```rust
-use async_std::task;
 use coi::{container, Inject};
 use std::sync::Arc;
 
+// Inherit `Inject` on all traits you'd like to inject
 pub trait Trait1: Inject {
     fn describe(&self) -> &'static str;
 }
 
+// derive `Inject` on all structs that will provide the implementation
 #[derive(Inject)]
 #[provides(dyn Trait1 with Impl1)]
 struct Impl1;
 
+// actually impl the trait
 impl Trait1 for Impl1 {
     fn describe(&self) -> &'static str {
         "I'm impl1!"
@@ -38,6 +40,7 @@ pub trait Trait2: Inject {
 #[derive(Inject)]
 #[provides(dyn Trait2 with Impl2::new(trait1))]
 struct Impl2 {
+    // inject dependencies by Arc<dyn SomeTrait>
     #[inject]
     trait1: Arc<dyn Trait1>,
 }
@@ -54,16 +57,20 @@ impl Trait2 for Impl2 {
     }
 }
 
+// It even works on structs
 #[derive(Debug, Inject)]
 #[provides(JustAStruct with JustAStruct)]
 pub struct JustAStruct;
 
 fn main() {
+    // Then construct your container with the helper `container!` macro
     let container = container!{
         trait1 => Impl1,
         trait2 => Impl2.scoped,
         struct => JustAStruct.singleton
     };
+
+    // And resolve away!
     let trait2 = container
         .resolve::<dyn Trait2>("trait2")
         .expect("Should exist");

@@ -210,6 +210,63 @@
 //! println!("Deep description: {}", trait2.deep_describe());
 //! ```
 //!
+//! # Debugging
+//!
+//! To turn on debugging features, enable the `debug` feature (see below), then you'll have access
+//! to the following changes:
+//!
+//! *  Formatting a container with `{:?}` will also list the dependencies (in A: Vec&lt;B&gt; style)
+//! *  `Container` will get an [`analyze`] fn, which will return an error if any misconfiguration is
+//! detected. See the docs for [`analyze`] for more details.
+//! *  `Container` will get a [`dot_graph`] fn, which will return a string that can be passed to
+//! [graphviz]'s dot command to generate a graph. The image below was generated with the sample
+//! project that's in this crate's repository (output saved to `deps.dot` then ran
+//! `dot -Tsvg deps.dot -o deps.svg `):
+//!
+//! <div>
+//! <svg width="168pt" height="188pt"
+//! viewBox="0.00 0.00 167.89 188.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+//! <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 184)">
+//! <title>%3</title>
+//! <polygon fill="#ffffff" stroke="transparent" points="-4,4 -4,-184 163.8858,-184 163.8858,4 -4,4"/>
+//! <!-- 0 -->
+//! <g id="node1" class="node">
+//! <title>0</title>
+//! <ellipse fill="none" stroke="#000000" cx="79.9429" cy="-18" rx="67.6881" ry="18"/>
+//! <text text-anchor="middle" x="79.9429" y="-14.3" font-family="Times,serif" font-size="14.00" fill="#000000">Singleton &#45; pool</text>
+//! </g>
+//! <!-- 1 -->
+//! <g id="node2" class="node">
+//! <title>1</title>
+//! <ellipse fill="none" stroke="#000000" cx="79.9429" cy="-90" rx="79.8859" ry="18"/>
+//! <text text-anchor="middle" x="79.9429" y="-86.3" font-family="Times,serif" font-size="14.00" fill="#000000">Scoped &#45; repository</text>
+//! </g>
+//! <!-- 1&#45;&gt;0 -->
+//! <g id="edge1" class="edge">
+//! <title>1&#45;&gt;0</title>
+//! <path fill="none" stroke="#000000" d="M79.9429,-71.8314C79.9429,-64.131 79.9429,-54.9743 79.9429,-46.4166"/>
+//! <polygon fill="#000000" stroke="#000000" points="83.443,-46.4132 79.9429,-36.4133 76.443,-46.4133 83.443,-46.4132"/>
+//! </g>
+//! <!-- 2 -->
+//! <g id="node3" class="node">
+//! <title>2</title>
+//! <ellipse fill="none" stroke="#000000" cx="79.9429" cy="-162" rx="69.5877" ry="18"/>
+//! <text text-anchor="middle" x="79.9429" y="-158.3" font-family="Times,serif" font-size="14.00" fill="#000000">Scoped &#45; service</text>
+//! </g>
+//! <!-- 2&#45;&gt;1 -->
+//! <g id="edge2" class="edge">
+//! <title>2&#45;&gt;1</title>
+//! <path fill="none" stroke="#000000" d="M79.9429,-143.8314C79.9429,-136.131 79.9429,-126.9743 79.9429,-118.4166"/>
+//! <polygon fill="#000000" stroke="#000000" points="83.443,-118.4132 79.9429,-108.4133 76.443,-118.4133 83.443,-118.4132"/>
+//! </g>
+//! </g>
+//! </svg>
+//! </div>
+//!
+//! [`analyze`]: struct.Container.html#method.analyze
+//! [`dot_graph`]: struct.Container.html#method.dot_graph
+//! [graphviz]: https://www.graphviz.org/
+//!
 //! # Features
 //!
 //! Compilation taking too long? Turn off features you're not using.
@@ -221,7 +278,17 @@
 //! coi = { version = "...", default-features = false }
 //! ```
 //!
+//! Why the #$*%T won't my container work!?
+//!
+//! To turn on debugging features:
+//! ```toml
+//! # Cargo.tomlk
+//! [dependencies]
+//! coi = { version = "...", default-features = false, features = ["debug"] }
+//! ```
+//!
 //! - default: `derive` - Procedural macros are re-exported.
+//! - debug: `Debug` impl
 //! - None - Procedural macros are not re-exported.
 //!
 //! # Help
@@ -292,7 +359,12 @@ use std::sync::{Arc, Mutex};
 #[cfg(any(feature = "derive", feature = "debug"))]
 pub use coi_derive::*;
 #[cfg(feature = "debug")]
-use std::fmt::Debug;
+use petgraph::{
+    algo::toposort,
+    graph::{DiGraph, NodeIndex},
+};
+#[cfg(feature = "debug")]
+use std::fmt::{self, Debug};
 
 /// Errors produced by this crate
 #[derive(Debug, thiserror::Error)]
@@ -445,7 +517,6 @@ impl<T> Registration<T> {
     }
 }
 
-/// A struct that manages all injected types.
 #[derive(Clone, Debug)]
 struct InnerContainer {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
@@ -468,8 +539,43 @@ impl InnerContainer {
     }
 }
 
+/// A struct that manages all injected types.
 #[derive(Clone, Debug)]
 pub struct Container(Arc<Mutex<InnerContainer>>);
+
+#[cfg(feature = "debug")]
+#[derive(Debug, thiserror::Error)]
+pub enum AnalysisError {
+    // FIXME(pfaria), it would be better if we could trace the
+    // entire cycle and store a Vec<String> here. Might require
+    // manually calling petgraph::visit::depth_first_search
+    /// There is a cyclic dependency within the container
+    #[error("Cycle detected at node `{0}`")]
+    Cycle(String),
+    #[error("Node `{0}` depends on `{1}`, the latter of which is not registered")]
+    Missing(String, String),
+}
+
+#[cfg(feature = "debug")]
+#[derive(Clone, Default)]
+struct AnalysisNode {
+    registration: Option<RegistrationKind>,
+    id: String,
+}
+
+#[cfg(feature = "debug")]
+impl fmt::Display for AnalysisNode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.registration {
+            Some(reg) => match reg {
+                RegistrationKind::Transient => write!(f, "Transient - {}", self.id),
+                RegistrationKind::Singleton => write!(f, "Singleton - {}", self.id),
+                RegistrationKind::Scoped => write!(f, "Scoped - {}", self.id),
+            },
+            None => write!(f, "MISSING - {}", self.id),
+        }
+    }
+}
 
 impl Container {
     fn new(container: InnerContainer) -> Self {
@@ -559,6 +665,86 @@ impl Container {
             dependency_map: container.dependency_map.clone(),
             parent: Some(self.clone()),
         })
+    }
+
+    #[cfg(feature = "debug")]
+    fn dependency_graph(&self) -> DiGraph<AnalysisNode, AnalysisNode> {
+        let container = self.0.lock().unwrap();
+        let mut graph = DiGraph::<AnalysisNode, AnalysisNode>::new();
+        let mut key_to_node = container
+            .dependency_map
+            .iter()
+            .map(|(k, _)| -> (&str, NodeIndex) {
+                let kind = container.provider_map[k].kind;
+                let n = graph.add_node(AnalysisNode {
+                    registration: Some(kind),
+                    id: k.to_owned(),
+                });
+                (k, n)
+            })
+            .collect::<HashMap<&str, _>>();
+        for (k, deps) in &container.dependency_map {
+            let kn = key_to_node[k as &str];
+            let edges = deps
+                .iter()
+                .map(|dep| {
+                    // TODO(pfaria) it's possible for dep to not
+                    // be in the hashmap, and we should return an
+                    // error in that case.
+                    let vn = match key_to_node.get(dep) {
+                        Some(vn) => *vn,
+                        None => {
+                            let vn = graph.add_node(AnalysisNode {
+                                registration: None,
+                                id: (*dep).to_owned(),
+                            });
+                            key_to_node.insert(dep, vn);
+                            key_to_node[dep]
+                        }
+                    };
+                    (kn, vn)
+                })
+                .collect::<Vec<_>>();
+            graph.extend_with_edges(&edges[..]);
+        }
+
+        graph
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn analyze(&self) -> std::result::Result<(), Vec<AnalysisError>> {
+        use petgraph::Direction;
+        let graph = self.dependency_graph();
+        let mut errors = graph
+            .node_indices()
+            .filter(|i| graph[*i].registration.is_none())
+            .map(|i| {
+                let to = &graph[i].id;
+                graph
+                    .neighbors_directed(i, Direction::Incoming)
+                    .map(|from| AnalysisError::Missing(graph[from].id.clone(), to.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        // Do any cycles exist?
+        if let Err(cycle) = toposort(&graph, None) {
+            errors.push(AnalysisError::Cycle(graph[cycle.node_id()].id.clone()));
+        }
+
+        if errors.len() > 0 {
+            Err(errors)
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn dot_graph(&self) -> String {
+        use petgraph::dot::{Config, Dot};
+        let graph = self.dependency_graph();
+        format!("{}", Dot::with_config(&graph, &[Config::EdgeNoLabel]))
     }
 }
 
