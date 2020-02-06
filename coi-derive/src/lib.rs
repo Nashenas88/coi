@@ -201,10 +201,47 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         }
         // FIXME(pfaria) add support for unnamed fields by allowing the name to be
         // specified as part of the attribute params
-        Fields::Unnamed(_) => {
-            return Error::new_spanned(data_struct.fields, "unnamed fields cannot be injected")
-                .to_compile_error()
-                .into()
+        Fields::Unnamed(unnamed_fields) => {
+            let injectable_fields: Vec<_> = unnamed_fields
+                .unnamed
+                .into_iter()
+                .filter_map(|field| {
+                    let name: Result<Ident> = if let Some(attr) =
+                        field.attrs.iter().find(|attr| attr.path.is_ident("inject"))
+                    {
+                        attr.parse_args()
+                    } else {
+                        return None;
+                    };
+
+                    Some(name.and_then(|name| {
+                        let ty = field.ty;
+                        Ok(parse_quote! {
+                            #name: #ty
+                        })
+                    }))
+                })
+                .collect();
+
+            if injectable_fields.iter().any(|f| f.is_err()) {
+                return injectable_fields
+                    .into_iter()
+                    .fold(Ok(()), |acc, f| match f {
+                        Ok(_) => acc,
+                        Err(e) => match acc {
+                            Ok(()) => Err(e),
+                            Err(mut e2) => {
+                                e2.combine(e);
+                                Err(e2)
+                            }
+                        },
+                    })
+                    .unwrap_err()
+                    .to_compile_error()
+                    .into();
+            }
+
+            injectable_fields.into_iter().map(Result::unwrap).collect()
         }
         Fields::Unit => vec![],
     };
