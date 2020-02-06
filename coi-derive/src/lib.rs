@@ -126,10 +126,26 @@ impl Parse for InjectableField {
 /// ```rust
 /// use coi::Inject;
 /// use coi_derive::Inject;
+/// 
 /// #[derive(Inject)]
 /// #[provides(pub InjectableStruct with InjectableStruct)]
 /// # pub
 /// struct InjectableStruct;
+/// ```
+/// 
+/// Unnamed fields
+/// ```rust
+/// use coi::Inject;
+/// use coi_derive::Inject;
+/// use std::sync::Arc;
+/// 
+/// #[derive(Inject)]
+/// #[provides(Dep1 with Dep1)]
+/// struct Dep1;
+/// 
+/// #[derive(Inject)]
+/// #[provides(Impl1 with Impl1(dep1))]
+/// struct Impl1(#[inject(dep1)] Arc<Dep1>);
 /// ```
 ///
 /// If you need some form of constructor fn that takes arguments that are not injected, then you
@@ -199,8 +215,6 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
             injectable_fields.into_iter().map(Result::unwrap).collect()
         }
-        // FIXME(pfaria) add support for unnamed fields by allowing the name to be
-        // specified as part of the attribute params
         Fields::Unnamed(unnamed_fields) => {
             let injectable_fields: Vec<_> = unnamed_fields
                 .unnamed
@@ -209,6 +223,8 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
                     let name: Result<Ident> = if let Some(attr) =
                         field.attrs.iter().find(|attr| attr.path.is_ident("inject"))
                     {
+                        // TODO(pfaria): Add error explaining that identifiers are required
+                        // for unnamed fields
                         attr.parse_args()
                     } else {
                         return None;
