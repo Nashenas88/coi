@@ -126,10 +126,26 @@ impl Parse for InjectableField {
 /// ```rust
 /// use coi::Inject;
 /// use coi_derive::Inject;
+///
 /// #[derive(Inject)]
 /// #[provides(pub InjectableStruct with InjectableStruct)]
 /// # pub
 /// struct InjectableStruct;
+/// ```
+///
+/// Unnamed fields
+/// ```rust
+/// use coi::Inject;
+/// use coi_derive::Inject;
+/// use std::sync::Arc;
+///
+/// #[derive(Inject)]
+/// #[provides(Dep1 with Dep1)]
+/// struct Dep1;
+///
+/// #[derive(Inject)]
+/// #[provides(Impl1 with Impl1(dep1))]
+/// struct Impl1(#[inject(dep1)] Arc<Dep1>);
 /// ```
 ///
 /// If you need some form of constructor fn that takes arguments that are not injected, then you
@@ -199,12 +215,49 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
             injectable_fields.into_iter().map(Result::unwrap).collect()
         }
-        // FIXME(pfaria) add support for unnamed fields by allowing the name to be
-        // specified as part of the attribute params
-        Fields::Unnamed(_) => {
-            return Error::new_spanned(data_struct.fields, "unnamed fields cannot be injected")
-                .to_compile_error()
-                .into()
+        Fields::Unnamed(unnamed_fields) => {
+            let injectable_fields: Vec<_> = unnamed_fields
+                .unnamed
+                .into_iter()
+                .filter_map(|field| {
+                    let name: Result<Ident> = if let Some(attr) =
+                        field.attrs.iter().find(|attr| attr.path.is_ident("inject"))
+                    {
+                        // TODO(pfaria): Add error explaining that identifiers are required
+                        // for unnamed fields
+                        attr.parse_args()
+                    } else {
+                        return None;
+                    };
+
+                    Some(name.and_then(|name| {
+                        let ty = field.ty;
+                        Ok(parse_quote! {
+                            #name: #ty
+                        })
+                    }))
+                })
+                .collect();
+
+            if injectable_fields.iter().any(|f| f.is_err()) {
+                return injectable_fields
+                    .into_iter()
+                    .fold(Ok(()), |acc, f| match f {
+                        Ok(_) => acc,
+                        Err(e) => match acc {
+                            Ok(()) => Err(e),
+                            Err(mut e2) => {
+                                e2.combine(e);
+                                Err(e2)
+                            }
+                        },
+                    })
+                    .unwrap_err()
+                    .to_compile_error()
+                    .into();
+            }
+
+            injectable_fields.into_iter().map(Result::unwrap).collect()
         }
         Fields::Unit => vec![],
     };
