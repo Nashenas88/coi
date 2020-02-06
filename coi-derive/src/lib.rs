@@ -126,23 +126,23 @@ impl Parse for InjectableField {
 /// ```rust
 /// use coi::Inject;
 /// use coi_derive::Inject;
-/// 
+///
 /// #[derive(Inject)]
 /// #[provides(pub InjectableStruct with InjectableStruct)]
 /// # pub
 /// struct InjectableStruct;
 /// ```
-/// 
+///
 /// Unnamed fields
 /// ```rust
 /// use coi::Inject;
 /// use coi_derive::Inject;
 /// use std::sync::Arc;
-/// 
+///
 /// #[derive(Inject)]
 /// #[provides(Dep1 with Dep1)]
 /// struct Dep1;
-/// 
+///
 /// #[derive(Inject)]
 /// #[provides(Impl1 with Impl1(dep1))]
 /// struct Impl1(#[inject(dep1)] Arc<Dep1>);
