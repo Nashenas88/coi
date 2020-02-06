@@ -169,6 +169,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
             let injectable_fields: Vec<_> = named_fields
                 .named
                 .into_iter()
+                .filter(|field| field.attrs.iter().any(|attr| attr.path.is_ident("inject")))
                 .map(|field| -> Result<InjectableField> {
                     let field_name = field.ident.unwrap();
                     let field_ty = field.ty;
