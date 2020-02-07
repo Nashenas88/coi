@@ -3,7 +3,7 @@ use actix_web::{
     web::{self, HttpResponse, ServiceConfig},
     Responder,
 };
-use coi_actix_web::{ContainerKey, Injected};
+use coi::{ContainerKey, Injected};
 use std::sync::Arc;
 
 struct ServiceKey;

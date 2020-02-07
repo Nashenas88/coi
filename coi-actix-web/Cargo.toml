@@ -1,6 +1,6 @@
 [package]
 name = "coi-actix-web"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -13,5 +13,9 @@ readme = "README.md"
 [dependencies]
 actix-web = "2.0.0"
 coi = "0.7.0"
-futures = "0.3.1"
+futures = "0.3.4"
 log = "0.4.8"
+
+[features]
+default = []
+debug = ["coi/debug"]

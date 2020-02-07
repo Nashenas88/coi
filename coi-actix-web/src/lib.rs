@@ -1,14 +1,13 @@
 //! (TODO)
 
 // re-export coi for convenience
-pub use coi;
+pub use coi::*;
 
 use actix_web::{
     dev::Payload,
-    error::{Error, ErrorInternalServerError, Result},
+    error::{Error as WebError, ErrorInternalServerError, Result as WebResult},
     FromRequest, HttpRequest,
 };
-use coi::{Container, Inject};
 use futures::future::{err, ok, ready, Ready};
 use std::{marker::PhantomData, sync::Arc};
 
@@ -32,8 +31,8 @@ where
     T: Inject + ?Sized,
     K: ContainerKey<T>,
 {
-    type Error = Error;
-    type Future = Ready<Result<Self, Self::Error>>;
+    type Error = WebError;
+    type Future = Ready<WebResult<Self, Self::Error>>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
@@ -66,8 +65,8 @@ macro_rules! injected_tuples {
             $K: ContainerKey<$T>,
         )+
         {
-            type Error = Error;
-            type Future = Ready<Result<Self, Self::Error>>;
+            type Error = WebError;
+            type Future = Ready<WebResult<Self, Self::Error>>;
             type Config = ();
 
             fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
