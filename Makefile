@@ -1,7 +1,8 @@
 .PHONY: test check clippy
 
 # Find all directories in the current dir that have Cargo.toml files
-CRATES=$(dir $(wildcard */Cargo.toml))
+PRE_CRATES=$(dir $(wildcard **/Cargo.toml))
+CRATES=$(PRE_CRATES) coi/coi-derive/
 
 test:
 	failed=false; \
