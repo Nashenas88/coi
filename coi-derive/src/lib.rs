@@ -148,8 +148,43 @@ impl Parse for InjectableField {
 /// struct Impl1(#[inject(dep1)] Arc<Dep1>);
 /// ```
 ///
+/// Generics
+/// ```rust
+/// use coi::Inject;
+/// use coi_derive::Inject;
+///
+/// #[derive(Inject)]
+/// #[provides(Impl1<T> with Impl1::<T>::new())]
+/// struct Impl1<T>(T)
+/// where
+///     T: Default;
+///
+/// impl<T> Impl1<T>
+/// where
+///     T: Default,
+/// {
+///     fn new() -> Self {
+///         Self(Default::default())
+///     }
+/// }
+/// 
+/// fn build_container() {
+///   // Take note that these providers have to be constructed
+///   // with explicit types.
+///   let impl1_provider = Impl1Provider::<bool>::new();
+///   let container = container! {
+///       impl1 => impl1_provider,
+///   };
+///   let _bool_impl = container
+///       .resolve::<Impl1<bool>>("impl1")
+///       .expect("Should exist");
+/// }
+/// 
+/// # build_container();
+/// ```
+///
 /// If you need some form of constructor fn that takes arguments that are not injected, then you
-/// need to manually implement the `Provide` trait, and this derive will not be usable.
+/// need to manually implement the `Provide` trait, and this derive will not be useful.
 #[proc_macro_derive(Inject, attributes(provides, inject))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
