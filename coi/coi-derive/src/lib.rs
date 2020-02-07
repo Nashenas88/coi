@@ -150,7 +150,7 @@ impl Parse for InjectableField {
 ///
 /// Generics
 /// ```rust
-/// use coi::Inject;
+/// use coi::{container, Inject};
 /// use coi_derive::Inject;
 ///
 /// #[derive(Inject)]

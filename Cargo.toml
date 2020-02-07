@@ -3,16 +3,10 @@ members = [
     "coi",
     "coi-actix-sample",
     "coi-actix-web",
-    "coi-derive",
     "coi-test",
     "coi-test-debug",
     "coi-test-no-derive",
 ]
-
-[patch.crates-io]
-coi = { path = "coi", version = "0.6.1" }
-coi-derive = { path = "coi-derive" }
-coi-actix-web = { path = "coi-actix-web" }
 
 [profile.release.build-override]
 opt-level = 0
