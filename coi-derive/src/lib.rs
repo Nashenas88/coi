@@ -180,6 +180,24 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         Some(attr) => attr,
     };
 
+    let has_generics = !input.generics.params.is_empty();
+    let generic_params = input.generics.params;
+    let generics = if has_generics {
+        quote! {
+            <#generic_params>
+        }
+    } else {
+        quote! {}
+    };
+    let where_clause = input
+        .generics
+        .where_clause
+        .map(|w| {
+            let t: Vec<_> = generic_params.iter().collect();
+            quote! { #w #(, #t: Send + Sync + 'static )* }
+        })
+        .unwrap_or_default();
+
     let args: Vec<_> = match data_struct.fields {
         Fields::Named(named_fields) => {
             let injectable_fields: Vec<_> = named_fields
@@ -327,18 +345,47 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         vec![]
     };
 
+    let provider_fields = if has_generics {
+        let tys: Vec<_> = generic_params.iter().cloned().collect();
+        quote! {
+            (
+                #( ::std::marker::PhantomData<#tys> )*
+            )
+        }
+    } else {
+        quote! {}
+    };
+
+    let phantom_data: Vec<_> = generic_params
+        .iter()
+        .map(|_| quote! {::std::marker::PhantomData})
+        .collect();
+
+    let provider_impl = if !phantom_data.is_empty() {
+        quote! {
+            impl #generics #provider #generics #where_clause {
+                #vis fn new() -> Self {
+                    Self(#( #phantom_data )*)
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
-        impl Inject for #input_ident {}
+        impl#generics Inject for #input_ident #generics #where_clause {}
 
-        #vis struct #provider;
+        #vis struct #provider #generics #provider_fields #where_clause;
+        #provider_impl
 
-        impl ::coi::Provide for #provider {
+        impl #generics coi::Provide for #provider #generics #where_clause {
             type Output = #ty;
 
             fn provide(
                 &self,
-                #container: &::coi::Container,
-            ) -> ::coi::Result<::std::sync::Arc<Self::Output>> {
+                #container: &coi::Container,
+            ) -> coi::Result<::std::sync::Arc<Self::Output>> {
                 #( #resolve )*
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
             }
