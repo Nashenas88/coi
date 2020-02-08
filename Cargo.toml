@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "coi",
-    "coi-actix-sample",
     "coi-test",
     "coi-test-debug",
     "coi-test-no-derive",
