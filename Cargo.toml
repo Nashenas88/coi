@@ -2,7 +2,6 @@
 members = [
     "coi",
     "coi-actix-sample",
-    "coi-actix-web",
     "coi-test",
     "coi-test-debug",
     "coi-test-no-derive",
