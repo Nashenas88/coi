@@ -167,7 +167,7 @@ impl Parse for InjectableField {
 ///         Self(Default::default())
 ///     }
 /// }
-/// 
+///
 /// fn build_container() {
 ///   // Take note that these providers have to be constructed
 ///   // with explicit types.
@@ -179,7 +179,7 @@ impl Parse for InjectableField {
 ///       .resolve::<Impl1<bool>>("impl1")
 ///       .expect("Should exist");
 /// }
-/// 
+///
 /// # build_container();
 /// ```
 ///
@@ -197,23 +197,6 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         }
     };
     let provider = format_ident!("{}Provider", input.ident);
-    let attr = match input.attrs.into_iter().find(|attr| {
-        attr.path
-            .segments
-            .first()
-            .map(|p| p.ident.eq("provides"))
-            .unwrap_or(false)
-    }) {
-        None => {
-            return Error::new_spanned(
-                input.ident,
-                "#[derive(Inject)] requires a `provides` attribute",
-            )
-            .to_compile_error()
-            .into()
-        }
-        Some(attr) => attr,
-    };
 
     let has_generics = !input.generics.params.is_empty();
     let generic_params = input.generics.params;
@@ -232,6 +215,20 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
             quote! { #w #(, #t: Send + Sync + 'static )* }
         })
         .unwrap_or_default();
+    let attr = match input
+        .attrs
+        .into_iter()
+        .find(|attr| attr.path.is_ident("provides"))
+    {
+        None => {
+            let ident = input.ident;
+            return quote! {
+                impl #generics coi::Inject for #ident #generics #where_clause {}
+            }
+            .into();
+        }
+        Some(attr) => attr,
+    };
 
     let args: Vec<_> = match data_struct.fields {
         Fields::Named(named_fields) => {
@@ -409,7 +406,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        impl#generics Inject for #input_ident #generics #where_clause {}
+        impl #generics Inject for #input_ident #generics #where_clause {}
 
         #vis struct #provider #generics #provider_fields #where_clause;
         #provider_impl
@@ -422,6 +419,110 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
                 #container: &coi::Container,
             ) -> coi::Result<::std::sync::Arc<Self::Output>> {
                 #( #resolve )*
+                Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
+            }
+
+            #( #dependencies_fn )*
+        }
+    };
+    TokenStream::from(expanded)
+}
+
+/// There might be some cases where you need to have data passed in with your
+/// provider. 
+/// ```
+#[proc_macro_derive(Provide, attributes(provides))]
+pub fn provide_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    match input.data {
+        Data::Struct(_) => {},
+        _ => {
+            return Error::new_spanned(input, "#[derive(Provide)] only supports structs")
+                .to_compile_error()
+                .into()
+        }
+    };
+
+    let provider = input.ident.clone();
+    let attr = match input.attrs.into_iter().find(|attr| {
+        attr.path
+            .segments
+            .first()
+            .map(|p| p.ident.eq("provides"))
+            .unwrap_or(false)
+    }) {
+        None => {
+            return Error::new_spanned(
+                input.ident,
+                "#[derive(Provide)] requires a `provides` attribute",
+            )
+            .to_compile_error()
+            .into()
+        }
+        Some(attr) => attr,
+    };
+
+    let has_generics = !input.generics.params.is_empty();
+    let generic_params = input.generics.params;
+    let generics = if has_generics {
+        quote! {
+            <#generic_params>
+        }
+    } else {
+        quote! {}
+    };
+    let where_clause = input
+        .generics
+        .where_clause
+        .map(|w| {
+            let t: Vec<_> = generic_params.iter().collect();
+            quote! { #w #(, #t: Send + Sync + 'static )* }
+        })
+        .unwrap_or_default();
+
+    let attr2 = attr.clone();
+    let mut token_iter = attr2.tokens.into_iter();
+    let provides = match token_iter.next() {
+        Some(TokenTree::Group(group)) => {
+            let token_stream = TokenStream::from(group.stream());
+            parse_macro_input!(token_stream as Provides)
+        }
+        Some(s) => {
+            return Error::new_spanned(s, "expected `(ty with expr)`")
+                .to_compile_error()
+                .into()
+        }
+        _ => {
+            return Error::new_spanned(attr, "expected `(ty with expr)`")
+                .to_compile_error()
+                .into()
+        }
+    };
+    let ty = provides.ty;
+    let provides_with = provides.with;
+
+    let dependencies_fn = if cfg!(feature = "debug") {
+        vec![{
+            quote! {
+                fn dependencies(
+                    &self
+                ) -> Vec<&'static str> {
+                    vec![]
+                }
+            }
+        }]
+    } else {
+        vec![]
+    };
+        
+    let expanded = quote! {
+        impl #generics coi::Provide for #provider #generics #where_clause {
+            type Output = #ty;
+
+            fn provide(
+                &self,
+                _: &coi::Container,
+            ) -> coi::Result<::std::sync::Arc<Self::Output>> {
                 Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
             }
 

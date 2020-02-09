@@ -1,10 +1,19 @@
-[workspace]
-members = [
-    "coi",
-    "coi-test",
-    "coi-test-debug",
-    "coi-test-no-derive",
-]
+[package]
+name = "coi"
+version = "0.7.0"
+authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Nashenas88/coi"
+description = "coi is a Dependency Injection library."
+readme = "../README.md"
 
-[profile.release.build-override]
-opt-level = 0
+[dependencies]
+coi-derive = { path = "coi-derive", version = "0.7.0", optional = true, default-features = false }
+petgraph = { version = "0.5.0", optional = true }
+thiserror = "1.0.10"
+
+[features]
+default = ["derive"]
+derive = ["coi-derive"]
+debug = ["coi-derive/debug", "petgraph"]

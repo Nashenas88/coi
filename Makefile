@@ -4,32 +4,25 @@
 PRE_CRATES=$(dir $(wildcard **/Cargo.toml))
 CRATES=$(PRE_CRATES) coi/coi-derive/
 
-test:
+define run_on_crates
 	failed=false; \
 	for dir in $(CRATES); do \
 		echo "$$dir"; \
 		cd "$$dir"; \
-		cargo test $(EXTRA) || failed=true; \
+		cargo $(1) $(EXTRA) || failed=true; \
 		cd ..; \
 	done; \
 	if [ "$$failed" = "true" ]; then exit 1; fi
+endef
+
+test:
+	$(call run_on_crates, test)
 
 check:
-	failed=false; \
-	for dir in $(CRATES); do\
-		echo "$$dir"; \
-		cd "$$dir"; \
-		cargo check $(EXTRA) || failed=true; \
-		cd ..; \
-	done; \
-	if [ "$$failed" = "true" ]; then exit 1; fi
+	$(call run_on_crates, check)
 
 clippy:
-	failed=false; \
-	for dir in $(CRATES); do\
-		echo "$$dir"; \
-		cd "$$dir"; \
-		cargo clippy $(EXTRA) || failed=true; \
-		cd ..; \
-	done; \
-	if [ "$$failed" = "true" ]; then exit 1; fi
+	$(call run_on_crates, clippy)
+
+fmt:
+	$(call run_on_crates, fmt)
