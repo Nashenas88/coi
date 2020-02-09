@@ -1,8 +1,7 @@
-.PHONY: test check clippy
+.PHONY: test check clippy fmt
 
 # Find all directories in the current dir that have Cargo.toml files
-PRE_CRATES=$(dir $(wildcard **/Cargo.toml))
-CRATES=$(PRE_CRATES) coi/coi-derive/
+CRATES=$(dir $(wildcard **/Cargo.toml))
 
 define run_on_crates
 	failed=false; \
