@@ -429,13 +429,13 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 }
 
 /// There might be some cases where you need to have data passed in with your
-/// provider. 
+/// provider.
 /// ```
 #[proc_macro_derive(Provide, attributes(provides))]
 pub fn provide_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match input.data {
-        Data::Struct(_) => {},
+        Data::Struct(_) => {}
         _ => {
             return Error::new_spanned(input, "#[derive(Provide)] only supports structs")
                 .to_compile_error()
@@ -514,7 +514,7 @@ pub fn provide_derive(input: TokenStream) -> TokenStream {
     } else {
         vec![]
     };
-        
+
     let expanded = quote! {
         impl #generics coi::Provide for #provider #generics #where_clause {
             type Output = #ty;
