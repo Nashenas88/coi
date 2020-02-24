@@ -1,7 +1,7 @@
 use coi::{container, Inject};
 
 #[derive(Inject)]
-#[provides(Impl1<T> with Impl1::<T>::new())]
+#[coi(provides Impl1<T> with Impl1::<T>::new())]
 struct Impl1<T>(T)
 where
     T: Default;

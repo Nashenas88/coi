@@ -11,18 +11,18 @@ trait Dep1: Inject {}
 trait Dep2: Inject {}
 
 #[derive(Inject)]
-#[provides(Impl0 with Impl0)]
+#[coi(provides Impl0 with Impl0)]
 struct Impl0;
 
 #[derive(Inject)]
-#[provides(dyn Dep1 with Impl1)]
+#[coi(provides dyn Dep1 with Impl1)]
 struct Impl1;
 
 #[allow(dead_code)]
 #[derive(Inject)]
-#[provides(dyn Dep2 with Impl2::new(dep1))]
+#[coi(provides dyn Dep2 with Impl2::new(dep1))]
 struct Impl2 {
-    #[inject]
+    #[coi(inject)]
     dep1: Arc<dyn Dep1>,
 }
 
@@ -157,9 +157,9 @@ trait Hold: Inject {
 }
 
 #[derive(Inject)]
-#[provides(dyn Hold with Holder::new(id))]
+#[coi(provides dyn Hold with Holder::new(id))]
 struct Holder {
-    #[inject]
+    #[coi(inject)]
     id: Arc<dyn Id>,
 }
 
@@ -180,11 +180,11 @@ trait Dep3: Inject {
 }
 
 #[derive(Inject)]
-#[provides(dyn Dep3 with Impl3::new(id, hold))]
+#[coi(provides dyn Dep3 with Impl3::new(id, hold))]
 struct Impl3 {
-    #[inject]
+    #[coi(inject)]
     id: Arc<dyn Id>,
-    #[inject]
+    #[coi(inject)]
     hold: Arc<dyn Hold>,
 }
 

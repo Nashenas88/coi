@@ -3,25 +3,25 @@ use std::sync::Arc;
 
 trait Trait1: Inject {}
 #[derive(Inject)]
-#[provides(dyn Trait1 with Impl1)]
+#[coi(provides dyn Trait1 with Impl1)]
 struct Impl1;
 impl Trait1 for Impl1 {}
 
 trait Trait2: Inject {}
 #[derive(Inject)]
-#[provides(dyn Trait2 with Impl2)]
+#[coi(provides dyn Trait2 with Impl2)]
 struct Impl2;
 impl Trait2 for Impl2 {}
 
 trait Trait3: Inject {}
 #[derive(Inject)]
-#[provides(dyn Trait3 with Impl3)]
+#[coi(provides dyn Trait3 with Impl3)]
 struct Impl3;
 impl Trait3 for Impl3 {}
 
 trait Trait4: Inject {}
 #[derive(Inject)]
-#[provides(dyn Trait4 with Impl4)]
+#[coi(provides dyn Trait4 with Impl4)]
 struct Impl4;
 impl Trait4 for Impl4 {}
 
@@ -29,15 +29,15 @@ trait Trait5: Inject {}
 
 #[allow(unused)]
 #[derive(Inject)]
-#[provides(dyn Trait5 with Impl5::new(trait1, trait2, trait3, trait4))]
+#[coi(provides dyn Trait5 with Impl5::new(trait1, trait2, trait3, trait4))]
 struct Impl5 {
-    #[inject]
+    #[coi(inject)]
     trait1: Arc<dyn Trait1>,
-    #[inject]
+    #[coi(inject)]
     trait2: Arc<dyn Trait2>,
-    #[inject]
+    #[coi(inject)]
     trait3: Arc<dyn Trait3>,
-    #[inject]
+    #[coi(inject)]
     trait4: Arc<dyn Trait4>,
 }
 

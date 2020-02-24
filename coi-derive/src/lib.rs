@@ -4,73 +4,31 @@
 
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, TokenTree};
 use quote::{format_ident, quote};
-use syn::{
-    parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote, Data, DeriveInput, Error, Expr, Fields, Result, Token, Type,
-    Visibility,
-};
+use syn::{parse_macro_input, DeriveInput, Error};
 
-struct Provides {
-    vis: Visibility,
-    ty: Type,
-    with: Expr,
-}
+mod attr;
+mod ctxt;
+mod symbol;
 
-impl Parse for Provides {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let vis = input.parse()?;
-        let ty = input.parse()?;
-        input.parse().and_then(|ident: Ident| {
-            if ident.eq("with") {
-                Ok(())
-            } else {
-                Err(Error::new(ident.span(), "expected `with`"))
-            }
-        })?;
-        // FIXME(pfaria) we need to limit the kinds of exprs allowed here. Quite a few will
-        // fail to compile
-        let with = input.parse()?;
-        Ok(Provides { vis, ty, with })
-    }
-}
-
-struct InjectableField {
-    name: Ident,
-    ty: Type,
-}
-
-impl Parse for InjectableField {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let name = input.parse()?;
-        let _colon_separator: Token![:] = input.parse()?;
-        let arc: Ident = input.parse()?;
-        if !arc.eq("Arc") {
-            return Err(Error::new_spanned(arc, "expected `Arc<...>`"));
-        }
-        let _left_angle: Token![<] = input.parse()?;
-        let ty = input.parse()?;
-        let _right_angle: Token![>] = input.parse()?;
-        Ok(InjectableField { name, ty })
-    }
-}
+use crate::attr::Container;
+use crate::ctxt::Ctxt;
 
 /// Generates an impl for `Inject` and also generates a "Provider" struct with its own
 /// `Provide` impl.
 ///
-/// This derive proc macro impls `Inject` on the struct it modifies, and also processes two
+/// This derive proc macro impls `Inject` on the struct it modifies, and also processes #[coi(...)]
 /// attributes:
-/// - `#[provides]` - Only one of these is allowed per `#[derive(Inject)]`. It takes the form
+/// - `#[coi(provides ...)]` - Only one of these is allowed per `#[derive(Inject)]`. It takes the form
 /// ```rust,ignore
-/// #[provides(<vis> <ty> with <expr>)]
+/// #[coi(provides <vis> <ty> with <expr>)]
 /// ```
 /// It generates a provider struct with visibility `<vis>`
 /// that impls `Provide` with an output type of `Arc<<ty>>`. It will construct `<ty>` with `<expr>`,
-/// and all params to `<expr>` must match the struct fields marked with `#[inject]` (see the next
+/// and all params to `<expr>` must match the struct fields marked with `#[coi(inject)]` (see the next
 /// bullet item). `<vis>` must match the visibility of `<ty>` or you will get code that might not
 /// compile.
-/// - `#[inject]` - All fields marked `#[inject]` are resolved in the `provide` fn described above.
+/// - `#[coi(inject)]` - All fields marked `#[coi(inject)]` are resolved in the `provide` fn described above.
 /// Given a field `<field_name>: <field_ty>`, this attribute will cause the following resolution to
 /// be generated:
 /// ```rust,ignore
@@ -88,7 +46,7 @@ impl Parse for InjectableField {
 /// trait Priv: Inject {}
 ///
 /// #[derive(Inject)]
-/// #[provides(dyn Priv with SimpleStruct)]
+/// #[coi(provides dyn Priv with SimpleStruct)]
 /// # pub
 /// struct SimpleStruct;
 ///
@@ -104,10 +62,10 @@ impl Parse for InjectableField {
 /// pub trait Dependency: Inject {}
 ///
 /// #[derive(Inject)]
-/// #[provides(pub dyn Pub with NewStruct::new(dependency))]
+/// #[coi(provides pub dyn Pub with NewStruct::new(dependency))]
 /// # pub
 /// struct NewStruct {
-///     #[inject]
+///     #[coi(inject)]
 ///     dependency: Arc<dyn Dependency>,
 /// }
 ///
@@ -128,7 +86,7 @@ impl Parse for InjectableField {
 /// use coi_derive::Inject;
 ///
 /// #[derive(Inject)]
-/// #[provides(pub InjectableStruct with InjectableStruct)]
+/// #[coi(provides pub InjectableStruct with InjectableStruct)]
 /// # pub
 /// struct InjectableStruct;
 /// ```
@@ -140,12 +98,12 @@ impl Parse for InjectableField {
 /// use std::sync::Arc;
 ///
 /// #[derive(Inject)]
-/// #[provides(Dep1 with Dep1)]
+/// #[coi(provides Dep1 with Dep1)]
 /// struct Dep1;
 ///
 /// #[derive(Inject)]
-/// #[provides(Impl1 with Impl1(dep1))]
-/// struct Impl1(#[inject(dep1)] Arc<Dep1>);
+/// #[coi(provides Impl1 with Impl1(dep1))]
+/// struct Impl1(#[coi(inject = "dep1")] Arc<Dep1>);
 /// ```
 ///
 /// Generics
@@ -154,7 +112,7 @@ impl Parse for InjectableField {
 /// use coi_derive::Inject;
 ///
 /// #[derive(Inject)]
-/// #[provides(Impl1<T> with Impl1::<T>::new())]
+/// #[coi(provides Impl1<T> with Impl1::<T>::new())]
 /// struct Impl1<T>(T)
 /// where
 ///     T: Default;
@@ -185,18 +143,14 @@ impl Parse for InjectableField {
 ///
 /// If you need some form of constructor fn that takes arguments that are not injected, then you
 /// need to manually implement the `Provide` trait, and this derive will not be useful.
-#[proc_macro_derive(Inject, attributes(provides, inject))]
+#[proc_macro_derive(Inject, attributes(coi))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let data_struct = match input.data {
-        Data::Struct(data_struct) => data_struct,
-        _ => {
-            return Error::new_spanned(input, "#[derive(Inject)] only supports structs")
-                .to_compile_error()
-                .into()
-        }
+    let cx = Ctxt::new();
+    let container = match Container::from_ast(&cx, &input, true) {
+        Some(container) => container,
+        None => return to_compile_errors(cx.check().unwrap_err()).into(),
     };
-    let provider = format_ident!("{}Provider", input.ident);
 
     let has_generics = !input.generics.params.is_empty();
     let generic_params = input.generics.params;
@@ -207,6 +161,8 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     } else {
         quote! {}
     };
+
+    let coi = container.coi_path();
     let where_clause = input
         .generics
         .where_clause
@@ -215,105 +171,24 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
             quote! { #w #(, #t: Send + Sync + 'static )* }
         })
         .unwrap_or_default();
-    let attr = match input
-        .attrs
-        .into_iter()
-        .find(|attr| attr.path.is_ident("provides"))
-    {
-        None => {
-            let ident = input.ident;
-            return quote! {
-                impl #generics coi::Inject for #ident #generics #where_clause {}
-            }
-            .into();
+    if container.providers.is_empty() {
+        let ident = input.ident;
+        return quote! {
+            impl #generics #coi::Inject for #ident #generics #where_clause {}
         }
-        Some(attr) => attr,
-    };
+        .into();
+    }
 
-    let args: Vec<_> = match data_struct.fields {
-        Fields::Named(named_fields) => {
-            let injectable_fields: Vec<_> = named_fields
-                .named
-                .into_iter()
-                .filter(|field| field.attrs.iter().any(|attr| attr.path.is_ident("inject")))
-                .map(|field| -> Result<InjectableField> {
-                    let field_name = field.ident.unwrap();
-                    let field_ty = field.ty;
-                    Ok(parse_quote! {
-                        #field_name: #field_ty
-                    })
-                })
-                .collect();
-
-            if injectable_fields.iter().any(|f| f.is_err()) {
-                return injectable_fields
-                    .into_iter()
-                    .fold(Ok(()), |acc, f| match f {
-                        Ok(_) => acc,
-                        Err(e) => match acc {
-                            Ok(()) => Err(e),
-                            Err(mut e2) => {
-                                e2.combine(e);
-                                Err(e2)
-                            }
-                        },
-                    })
-                    .unwrap_err()
-                    .to_compile_error()
-                    .into();
-            }
-
-            injectable_fields.into_iter().map(Result::unwrap).collect()
+    let container_ident = format_ident!(
+        "{}",
+        if container.injected.is_empty() {
+            "_"
+        } else {
+            "container"
         }
-        Fields::Unnamed(unnamed_fields) => {
-            let injectable_fields: Vec<_> = unnamed_fields
-                .unnamed
-                .into_iter()
-                .filter_map(|field| {
-                    let name: Result<Ident> = if let Some(attr) =
-                        field.attrs.iter().find(|attr| attr.path.is_ident("inject"))
-                    {
-                        // TODO(pfaria): Add error explaining that identifiers are required
-                        // for unnamed fields
-                        attr.parse_args()
-                    } else {
-                        return None;
-                    };
-
-                    Some(name.and_then(|name| {
-                        let ty = field.ty;
-                        Ok(parse_quote! {
-                            #name: #ty
-                        })
-                    }))
-                })
-                .collect();
-
-            if injectable_fields.iter().any(|f| f.is_err()) {
-                return injectable_fields
-                    .into_iter()
-                    .fold(Ok(()), |acc, f| match f {
-                        Ok(_) => acc,
-                        Err(e) => match acc {
-                            Ok(()) => Err(e),
-                            Err(mut e2) => {
-                                e2.combine(e);
-                                Err(e2)
-                            }
-                        },
-                    })
-                    .unwrap_err()
-                    .to_compile_error()
-                    .into();
-            }
-
-            injectable_fields.into_iter().map(Result::unwrap).collect()
-        }
-        Fields::Unit => vec![],
-    };
-    let container = format_ident!("{}", if args.is_empty() { "_" } else { "container" });
-
-    let (resolve, keys): (Vec<_>, Vec<_>) = args
+    );
+    let (resolve, keys): (Vec<_>, Vec<_>) = container
+        .injected
         .into_iter()
         .map(|field| {
             let ident = field.name;
@@ -321,56 +196,20 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
             let key = format!("{}", ident);
             (
                 quote! {
-                    let #ident = #container.resolve::<#ty>(#key)?;
+                    let #ident = #container_ident.resolve::<#ty>(#key)?;
                 },
                 key,
             )
         })
         .unzip();
-
-    let attr2 = attr.clone();
-    let mut token_iter = attr2.tokens.into_iter();
-    let provides = match token_iter.next() {
-        Some(TokenTree::Group(group)) => {
-            let token_stream = TokenStream::from(group.stream());
-            parse_macro_input!(token_stream as Provides)
-        }
-        Some(s) => {
-            return Error::new_spanned(s, "expected `(ty with expr)`")
-                .to_compile_error()
-                .into()
-        }
-        _ => {
-            return Error::new_spanned(attr, "expected `(ty with expr)`")
-                .to_compile_error()
-                .into()
-        }
-    };
-    let vis = provides.vis;
-    let ty = provides.ty;
-    let provides_with = provides.with;
-
-    if let Some(s) = token_iter.next() {
-        return Error::new_spanned(
-            s,
-            "Only expected the format #[provides `Interface` with `provider`]",
-        )
-        .to_compile_error()
-        .into();
-    }
-
     let input_ident = input.ident;
 
     let dependencies_fn = if cfg!(feature = "debug") {
-        vec![{
-            quote! {
-                fn dependencies(
-                    &self
-                ) -> Vec<&'static str> {
-                    vec![
-                        #( #keys, )*
-                    ]
-                }
+        vec![quote! {
+            fn dependencies(&self) -> Vec<&'static str> {
+                vec![
+                    #( #keys, )*
+                ]
             }
         }]
     } else {
@@ -393,37 +232,59 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         .map(|_| quote! {::std::marker::PhantomData})
         .collect();
 
-    let provider_impl = if !phantom_data.is_empty() {
-        quote! {
-            impl #generics #provider #generics #where_clause {
-                #vis fn new() -> Self {
-                    Self(#( #phantom_data )*)
+    let provider_impls = if !phantom_data.is_empty() {
+        container.providers
+            .iter()
+            .map(|p| {
+                let provider = p.name_or(&input_ident);
+                let vis = &p.vis;
+                quote! {
+                    impl #generics #provider #generics #where_clause {
+                        #vis fn new() -> Self {
+                            Self(#( #phantom_data )*)
+                        }
+                    }
                 }
-            }
-        }
+            })
+            .collect()
     } else {
-        quote! {}
+        vec![]
     };
 
-    let expanded = quote! {
-        impl #generics Inject for #input_ident #generics #where_clause {}
+    let constructed_provides: Vec<_> = container
+        .providers
+        .into_iter()
+        .map(|p| {
+            let provider = p.name_or(&input_ident);
+            let vis = p.vis;
+            let ty = p.ty;
+            let provides_with = p.with;
 
-        #vis struct #provider #generics #provider_fields #where_clause;
-        #provider_impl
+            quote! {
+                #vis struct #provider #generics #provider_fields #where_clause;
 
-        impl #generics coi::Provide for #provider #generics #where_clause {
-            type Output = #ty;
+                impl #generics #coi::Provide for #provider #generics #where_clause {
+                    type Output = #ty;
 
-            fn provide(
-                &self,
-                #container: &coi::Container,
-            ) -> coi::Result<::std::sync::Arc<Self::Output>> {
-                #( #resolve )*
-                Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
+                    fn provide(
+                        &self,
+                        #container_ident: &#coi::Container,
+                    ) -> #coi::Result<::std::sync::Arc<Self::Output>> {
+                        #( #resolve )*
+                        Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
+                    }
+
+                    #( #dependencies_fn )*
+                }
             }
+        })
+        .collect();
 
-            #( #dependencies_fn )*
-        }
+    let expanded = quote! {
+        impl #generics #coi::Inject for #input_ident #generics #where_clause {}
+
+        #( #provider_impls )*
+        #( #constructed_provides )*
     };
     TokenStream::from(expanded)
 }
@@ -431,37 +292,16 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 /// There might be some cases where you need to have data passed in with your
 /// provider.
 /// ```
-#[proc_macro_derive(Provide, attributes(provides))]
+#[proc_macro_derive(Provide, attributes(coi))]
 pub fn provide_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match input.data {
-        Data::Struct(_) => {}
-        _ => {
-            return Error::new_spanned(input, "#[derive(Provide)] only supports structs")
-                .to_compile_error()
-                .into()
-        }
+    let cx = Ctxt::new();
+    let container = match Container::from_ast(&cx, &input, false) {
+        Some(ctr) => ctr,
+        None => return to_compile_errors(cx.check().unwrap_err()).into(),
     };
 
     let provider = input.ident.clone();
-    let attr = match input.attrs.into_iter().find(|attr| {
-        attr.path
-            .segments
-            .first()
-            .map(|p| p.ident.eq("provides"))
-            .unwrap_or(false)
-    }) {
-        None => {
-            return Error::new_spanned(
-                input.ident,
-                "#[derive(Provide)] requires a `provides` attribute",
-            )
-            .to_compile_error()
-            .into()
-        }
-        Some(attr) => attr,
-    };
-
     let has_generics = !input.generics.params.is_empty();
     let generic_params = input.generics.params;
     let generics = if has_generics {
@@ -480,27 +320,6 @@ pub fn provide_derive(input: TokenStream) -> TokenStream {
         })
         .unwrap_or_default();
 
-    let attr2 = attr.clone();
-    let mut token_iter = attr2.tokens.into_iter();
-    let provides = match token_iter.next() {
-        Some(TokenTree::Group(group)) => {
-            let token_stream = TokenStream::from(group.stream());
-            parse_macro_input!(token_stream as Provides)
-        }
-        Some(s) => {
-            return Error::new_spanned(s, "expected `(ty with expr)`")
-                .to_compile_error()
-                .into()
-        }
-        _ => {
-            return Error::new_spanned(attr, "expected `(ty with expr)`")
-                .to_compile_error()
-                .into()
-        }
-    };
-    let ty = provides.ty;
-    let provides_with = provides.with;
-
     let dependencies_fn = if cfg!(feature = "debug") {
         vec![{
             quote! {
@@ -515,19 +334,35 @@ pub fn provide_derive(input: TokenStream) -> TokenStream {
         vec![]
     };
 
-    let expanded = quote! {
-        impl #generics coi::Provide for #provider #generics #where_clause {
-            type Output = #ty;
+    let coi = container.coi_path();
+    let expanded: Vec<_> = container
+        .providers
+        .into_iter()
+        .map(|p| {
+            let ty = p.ty;
+            let provides_with = p.with;
+            quote! {
+                impl #generics #coi::Provide for #provider #generics #where_clause {
+                    type Output = #ty;
 
-            fn provide(
-                &self,
-                _: &coi::Container,
-            ) -> coi::Result<::std::sync::Arc<Self::Output>> {
-                Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
+                    fn provide(
+                        &self,
+                        _: &#coi::Container,
+                    ) -> #coi::Result<::std::sync::Arc<Self::Output>> {
+                        Ok(::std::sync::Arc::new(#provides_with) as ::std::sync::Arc<#ty>)
+                    }
+
+                    #( #dependencies_fn )*
+                }
             }
+        })
+        .collect();
+    TokenStream::from(quote! {
+        #( #expanded )*
+    })
+}
 
-            #( #dependencies_fn )*
-        }
-    };
-    TokenStream::from(expanded)
+fn to_compile_errors(errors: Vec<Error>) -> proc_macro2::TokenStream {
+    let compile_errors = errors.iter().map(Error::to_compile_error);
+    quote!(#(#compile_errors)*)
 }

@@ -1,7 +1,7 @@
 use coi::{container, Inject};
 
 #[derive(Inject)]
-#[provides(Impl1 with Impl1::new())]
+#[coi(provides Impl1 with Impl1::new())]
 struct Impl1 {
     num: usize,
 }
