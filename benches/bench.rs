@@ -224,7 +224,7 @@ macro_rules! make_wide_container {
 fn a_simple_resolve(b: &mut Bencher) {
     trait I: Inject {}
     #[derive(Inject)]
-    #[provides(dyn I with S)]
+    #[coi(provides dyn I with S)]
     struct S;
 
     impl I for S {}
@@ -366,10 +366,10 @@ macro_rules! make_dep {
         trait $trait: Inject {}
         #[allow(dead_code)]
         #[derive(Inject)]
-        #[provides(dyn $trait with $struct::new($($dep_name),*))]
+        #[coi(provides dyn $trait with $struct::new($($dep_name),*))]
         struct $struct {
             $(
-                #[inject]
+                #[coi(inject)]
                 $dep_name: Arc<dyn $dep_trait>,
             )*
         }

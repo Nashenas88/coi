@@ -6,7 +6,7 @@ pub trait Trait1: Inject {
 }
 
 #[derive(Inject)]
-#[provides(dyn Trait1 with Impl1)]
+#[coi(provides dyn Trait1 with Impl1)]
 struct Impl1;
 
 impl Trait1 for Impl1 {
@@ -20,9 +20,9 @@ pub trait Trait2: Inject {
 }
 
 #[derive(Inject)]
-#[provides(dyn Trait2 with Impl2::new(trait1))]
+#[coi(provides dyn Trait2 with Impl2::new(trait1))]
 struct Impl2 {
-    #[inject]
+    #[coi(inject)]
     trait1: Arc<dyn Trait1>,
 }
 
@@ -39,7 +39,7 @@ impl Trait2 for Impl2 {
 }
 
 #[derive(Debug, Inject)]
-#[provides(JustAStruct with JustAStruct)]
+#[coi(provides JustAStruct with JustAStruct)]
 pub struct JustAStruct;
 
 #[test]

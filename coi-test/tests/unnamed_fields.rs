@@ -2,12 +2,12 @@ use coi::{container, Inject};
 use std::sync::Arc;
 
 #[derive(Inject)]
-#[provides(Dep1 with Dep1)]
+#[coi(provides Dep1 with Dep1)]
 struct Dep1;
 
 #[derive(Inject)]
-#[provides(Impl1 with Impl1(dep1))]
-struct Impl1(#[inject(dep1)] Arc<Dep1>);
+#[coi(provides Impl1 with Impl1(dep1))]
+struct Impl1(#[coi(inject = "dep1")] Arc<Dep1>);
 
 #[test]
 fn main() {

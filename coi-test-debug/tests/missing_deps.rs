@@ -7,9 +7,9 @@ trait Trait3: Inject {}
 
 #[allow(dead_code)]
 #[derive(Inject)]
-#[provides(dyn Trait1 with Impl1::new(t3))]
+#[coi(provides dyn Trait1 with Impl1::new(t3))]
 struct Impl1 {
-    #[inject]
+    #[coi(inject)]
     t3: Arc<dyn Trait3>,
 }
 
@@ -22,9 +22,9 @@ impl Impl1 {
 
 #[allow(dead_code)]
 #[derive(Inject)]
-#[provides(dyn Trait2 with Impl2::new(t3))]
+#[coi(provides dyn Trait2 with Impl2::new(t3))]
 struct Impl2 {
-    #[inject]
+    #[coi(inject)]
     t3: Arc<dyn Trait3>,
 }
 

@@ -142,7 +142,7 @@
 //! #[derive(Inject)]
 //! // Currently, only one trait can be provided, but this will likely be expanded on in future
 //! // versions of this crate.
-//! #[provides(dyn Trait1 with Impl1)]
+//! #[coi(provides dyn Trait1 with Impl1)]
 //! struct Impl1;
 //!
 //! // Don't forget to actually implement the trait ;).
@@ -162,12 +162,12 @@
 //! // are derived from fields marked with the attribute `#[inject]`, so the parameter name must
 //! // match a field name.
 //! #[derive(Inject)]
-//! #[provides(dyn Trait2 with Impl2::new(trait1))]
+//! #[coi(provides dyn Trait2 with Impl2::new(trait1))]
 //! struct Impl2 {
 //!     // The name of the field is important! It must match the name that's registered in the
 //!     // container when the container is being built! This is similar to the behavior of
 //!     // dependency injection libraries in other languages.
-//!     #[inject]
+//!     #[coi(inject)]
 //!     trait1: Arc<dyn Trait1>,
 //! }
 //!
@@ -317,7 +317,7 @@
 //! pub trait InjectableTrait : Trait + Inject {}
 //!
 //! #[derive(Inject)]
-//! #[provides(pub dyn InjectableTrait with Impl{})]
+//! #[coi(provides pub dyn InjectableTrait with Impl{})]
 //! struct Impl {
 //! # /*
 //!     ...
@@ -401,7 +401,7 @@ pub enum RegistrationKind {
     /// # use std::ops::Deref;
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
-    /// # #[provides(dyn Trait with Impl)]
+    /// # #[coi(provides dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
@@ -432,7 +432,7 @@ pub enum RegistrationKind {
     /// # use std::{ops::Deref, sync::{Arc, Mutex}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
-    /// # #[provides(dyn Trait with Impl)]
+    /// # #[coi(provides dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
@@ -472,7 +472,7 @@ pub enum RegistrationKind {
     /// # use std::{ops::Deref, sync::{Arc, Mutex}};
     /// # trait Trait: Inject {}
     /// # #[derive(Inject)]
-    /// # #[provides(dyn Trait with Impl)]
+    /// # #[coi(provides dyn Trait with Impl)]
     /// # struct Impl;
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
@@ -688,9 +688,6 @@ impl Container {
             let edges = deps
                 .iter()
                 .map(|dep| {
-                    // TODO(pfaria) it's possible for dep to not
-                    // be in the hashmap, and we should return an
-                    // error in that case.
                     let vn = match key_to_node.get(dep) {
                         Some(vn) => *vn,
                         None => {
@@ -855,7 +852,7 @@ pub trait Provide {
 /// trait Dep: Inject {}
 ///
 /// #[derive(Inject)]
-/// #[provides(dyn Dep with Impl)]
+/// #[coi(provides dyn Dep with Impl)]
 /// struct Impl;
 ///
 /// impl Dep for Impl {}
