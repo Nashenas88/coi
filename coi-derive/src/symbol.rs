@@ -6,7 +6,6 @@ use syn::{Ident, Path};
 pub struct Symbol(&'static str);
 
 pub const ARC: Symbol = Symbol("Arc");
-pub const AS: Symbol = Symbol("As");
 pub const COI: Symbol = Symbol("coi");
 pub const CRATE: Symbol = Symbol("crate");
 pub const INJECT: Symbol = Symbol("inject");
