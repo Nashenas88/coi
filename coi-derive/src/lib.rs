@@ -147,10 +147,11 @@ use crate::ctxt::Ctxt;
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let cx = Ctxt::new();
-    let container = match Container::from_ast(&cx, &input, true) {
-        Some(container) => container,
-        None => return to_compile_errors(cx.check().unwrap_err()).into(),
-    };
+    let container = Container::from_ast(&cx, &input, true);
+    if let Err(e) = cx.check() {
+        return to_compile_errors(e).into();
+    }
+    let container = container.unwrap();
 
     let has_generics = !input.generics.params.is_empty();
     let generic_params = input.generics.params;
@@ -233,7 +234,8 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         .collect();
 
     let provider_impls = if !phantom_data.is_empty() {
-        container.providers
+        container
+            .providers
             .iter()
             .map(|p| {
                 let provider = p.name_or(&input_ident);
@@ -296,10 +298,11 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 pub fn provide_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let cx = Ctxt::new();
-    let container = match Container::from_ast(&cx, &input, false) {
-        Some(ctr) => ctr,
-        None => return to_compile_errors(cx.check().unwrap_err()).into(),
-    };
+    let container = Container::from_ast(&cx, &input, false);
+    if let Err(e) = cx.check() {
+        return to_compile_errors(e).into();
+    }
+    let container = container.unwrap();
 
     let provider = input.ident.clone();
     let has_generics = !input.generics.params.is_empty();

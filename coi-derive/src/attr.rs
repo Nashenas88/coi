@@ -64,11 +64,18 @@ impl Container {
             .filter_map(|attr| get_coi_attrs(cx, attr).map(|a| (a, attr)))
             .collect();
 
+        let has_multiple_unnamed_providers = coi_attrs.iter().fold(0, |acc, (coi_attr, _)| {
+            if let ContainerAttr::Provides(Provides { name: None, .. }) = coi_attr {
+                acc + 1
+            } else {
+                acc
+            }
+        }) > 1;
         for (coi_attr, attr) in coi_attrs {
             match coi_attr {
                 ContainerAttr::Provides(p) => {
-                    if !providers.is_empty() && p.name.is_none() {
-                        cx.push(Error::new_spanned(attr, "expected `#[coi(provides ... with ... as <unique name>)]` when multiple provides field attributes are supplied"))
+                    if has_multiple_unnamed_providers && p.name.is_none() {
+                        cx.push(Error::new_spanned(attr, "expected `#[coi(provides <type> as <unique name> with <expr>)]` when multiple provides field attributes are supplied"))
                     }
 
                     providers.push(p);
@@ -328,6 +335,15 @@ impl Parse for Provides {
 
         let vis = input.parse()?;
         let ty = input.parse()?;
+
+        let lookahead = input.lookahead1();
+        let name = if lookahead.peek(Token![as]) {
+            let _as: Token![as] = input.parse().unwrap();
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
         input.parse().and_then(|ident: Ident| {
             if ident.eq("with") {
                 Ok(())
@@ -338,14 +354,6 @@ impl Parse for Provides {
         // FIXME(pfaria) we need to limit the kinds of exprs allowed here. Quite a few will
         // fail to compile
         let with = input.parse()?;
-
-        let lookahead = input.lookahead1();
-        let name = if lookahead.peek(|_| AS.as_ident()) {
-            let _as: Ident = input.parse().unwrap();
-            Some(input.parse()?)
-        } else {
-            None
-        };
         Ok(Provides {
             vis,
             ty,
