@@ -120,7 +120,7 @@ use crate::ctxt::Ctxt;
 /// Generics
 /// ```rust
 /// use coi::{container, Inject};
-/// use coi_derive::Inject;
+/// # use coi_derive::Inject;
 ///
 /// #[derive(Inject)]
 /// #[coi(provides Impl1<T> with Impl1::<T>::new())]
