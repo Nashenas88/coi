@@ -504,6 +504,8 @@ pub enum RegistrationKind {
     Singleton,
 }
 
+/// A struct used to provide a registration to a container. It wraps a registration kind and
+/// a provider.
 #[derive(Clone, Debug)]
 pub struct Registration<T> {
     kind: RegistrationKind,
@@ -511,6 +513,7 @@ pub struct Registration<T> {
 }
 
 impl<T> Registration<T> {
+    /// Constructor for `Registration`. For it to be useful, `T` should impl `Provide`.
     pub fn new(kind: RegistrationKind, provider: T) -> Self {
         Self { kind, provider }
     }
@@ -542,6 +545,9 @@ impl InnerContainer {
 #[derive(Clone, Debug)]
 pub struct Container(Arc<Mutex<InnerContainer>>);
 
+/// Possible errors generated when running [`Container::analyze`].
+///
+/// [`Container::analyze`]: struct.Container.html#method.analyze
 #[cfg(feature = "debug")]
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
@@ -551,6 +557,7 @@ pub enum AnalysisError {
     /// There is a cyclic dependency within the container
     #[error("Cycle detected at node `{0}`")]
     Cycle(String),
+    /// There is a missing dependency. Param 0 depends on Param 1, and Param 1 is missing.
     #[error("Node `{0}` depends on `{1}`, the latter of which is not registered")]
     Missing(String, String),
 }
@@ -581,6 +588,7 @@ impl Container {
         Self(Arc::new(Mutex::new(container)))
     }
 
+    /// Resolve an `Arc<T>` whose provider was previously registered with `key`.
     pub fn resolve<T>(&self, key: &str) -> Result<Arc<T>>
     where
         T: Inject + ?Sized,
@@ -707,6 +715,12 @@ impl Container {
         graph
     }
 
+    // FIXME(pfaria): Add analysis on singleton registrations that depend on
+    // non-singleton registration.
+    /// Run an analysis on a container and return any issues detected.
+    /// Current analysis performed:
+    /// - Missing dependencies
+    /// - Cyclic dependencies
     #[cfg(feature = "debug")]
     pub fn analyze(&self) -> std::result::Result<(), Vec<AnalysisError>> {
         use petgraph::Direction;
@@ -736,6 +750,11 @@ impl Container {
         }
     }
 
+    /// Produces a dot format output that can be processed by the [graphviz] [`dot` (pdf)]
+    /// program to generate a graphical representation of the dependency graph.
+    ///
+    /// [graphviz]: http://graphviz.org/
+    /// [`dot` (pdf)]: https://graphviz.gitlab.io/_pages/pdf/dotguide.pdf
     #[cfg(feature = "debug")]
     pub fn dot_graph(&self) -> String {
         use petgraph::dot::{Config, Dot};
@@ -829,7 +848,9 @@ impl ContainerBuilder {
 
 /// A trait to manage the construction of an injectable trait or struct.
 pub trait Provide {
-    /// The type that this provider is intended to produce
+    /// The type that this provider will produce when resolved from a [`Container`].
+    ///
+    /// [`Container`]: struct.Container.html
     type Output: Inject + ?Sized;
 
     /// Only intended to be used internally
