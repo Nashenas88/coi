@@ -19,22 +19,33 @@ use crate::ctxt::Ctxt;
 ///
 /// This derive proc macro impls `Inject` on the struct it modifies, and also processes #[coi(...)]
 /// attributes:
-/// - `#[coi(provides ...)]` - Only one of these is allowed per `#[derive(Inject)]`. It takes the form
+/// - `#[coi(provides ...)]` - It takes the form
 /// ```rust,ignore
 /// #[coi(provides <vis> <ty> with <expr>)]
 /// ```
+/// or the form
+/// ```rust,ignore
+/// #[coi(provides <vis> <ty> as <name> with <expr>)]
+/// ```
+/// The latter form *must* be used when generating multiple providers for a single type. This might
+/// be useful if you have multiple trait implementations for one struct and want to provide separate
+/// unique instances for each trait in the container. That use case might be more common with mocks
+/// in unit tests rather than in production code.
+/// 
 /// It generates a provider struct with visibility `<vis>`
 /// that impls `Provide` with an output type of `Arc<<ty>>`. It will construct `<ty>` with `<expr>`,
-/// and all params to `<expr>` must match the struct fields marked with `#[coi(inject)]` (see the next
-/// bullet item). `<vis>` must match the visibility of `<ty>` or you will get code that might not
-/// compile.
-/// - `#[coi(inject)]` - All fields marked `#[coi(inject)]` are resolved in the `provide` fn described above.
+/// and all params to `<expr>` must match the struct fields marked with `#[coi(inject)]` (see the
+/// next bullet item). `<vis>` must match the visibility of `<ty>` or you will get code that might
+/// not compile. If `<name>` is not provided, the struct name will be used and `Provider` will be
+/// appended to it.
+/// - `#[coi(inject)]` - All fields marked `#[coi(inject)]` are resolved in the `provide` fn
+/// described above.
 /// Given a field `<field_name>: <field_ty>`, this attribute will cause the following resolution to
 /// be generated:
 /// ```rust,ignore
-/// let <field_name> = Container::resolve::<<field_ty>>(conainer, "<field_name>");
+/// let <field_name> = Container::resolve::<<field_ty>>(container, "<field_name>");
 /// ```
-/// Because of this, it's important that the field name MUST match the string that's used to
+/// Because of this, it's important that the field name *must* match the string that's used to
 /// register the provider in the `ContainerBuilder`.
 ///
 /// ## Examples
@@ -42,7 +53,7 @@ use crate::ctxt::Ctxt;
 /// Private trait and no dependencies
 /// ```rust
 /// use coi::Inject;
-/// use coi_derive::Inject;
+/// # use coi_derive::Inject;
 /// trait Priv: Inject {}
 ///
 /// #[derive(Inject)]
@@ -56,7 +67,7 @@ use crate::ctxt::Ctxt;
 /// Public trait and dependency
 /// ```rust
 /// use coi::Inject;
-/// use coi_derive::Inject;
+/// # use coi_derive::Inject;
 /// use std::sync::Arc;
 /// pub trait Pub: Inject {}
 /// pub trait Dependency: Inject {}
@@ -83,7 +94,7 @@ use crate::ctxt::Ctxt;
 /// Struct injection
 /// ```rust
 /// use coi::Inject;
-/// use coi_derive::Inject;
+/// # use coi_derive::Inject;
 ///
 /// #[derive(Inject)]
 /// #[coi(provides pub InjectableStruct with InjectableStruct)]
@@ -94,7 +105,7 @@ use crate::ctxt::Ctxt;
 /// Unnamed fields
 /// ```rust
 /// use coi::Inject;
-/// use coi_derive::Inject;
+/// # use coi_derive::Inject;
 /// use std::sync::Arc;
 ///
 /// #[derive(Inject)]
@@ -142,7 +153,10 @@ use crate::ctxt::Ctxt;
 /// ```
 ///
 /// If you need some form of constructor fn that takes arguments that are not injected, then you
-/// need to manually implement the `Provide` trait, and this derive will not be useful.
+/// might be able to use the [`coi::Provide`] derive. If that doesn't fit your use case, you'll
+/// need to manually implement `Provide`.
+/// 
+/// [`coi::Provide`]: derive.Provide.html
 #[proc_macro_derive(Inject, attributes(coi))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -291,8 +305,59 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// There might be some cases where you need to have data passed in with your
-/// provider.
+/// Generates an impl for `Provide` and also generates a "Provider" struct with its own
+/// `Provide` impl.
+///
+/// This derive proc macro impls `Provide` on the struct it modifies, and also processes #[coi(...)]
+/// attributes:
+/// - `#[coi(provides ...)]` - It takes the form
+/// ```rust,ignore
+/// #[coi(provides <vis> <ty> with <expr>)]
+/// ```
+/// 
+/// Multiple `provides` attributes are not allowed since this is for a specific `Provide` impl and
+/// not for the resolved type.
+/// 
+/// It generates a provider struct with visibility `<vis>`
+/// that impls `Provide` with an output type of `Arc<<ty>>`. It will construct `<ty>` with `<expr>`,
+/// and all params to `<expr>` must match the struct fields marked with `#[coi(inject)]` (see the
+/// next bullet item). `<vis>` must match the visibility of `<ty>` or you will get code that might
+/// not compile. If `<name>` is not provided, the struct name will be used and `Provider` will be
+/// appended to it.
+///
+/// ## Examples
+///
+/// Private trait and no dependencies
+/// ```rust
+/// use coi::{Inject, Provide};
+/// # use coi_derive::{Inject, Provide};
+/// trait Priv: Inject {}
+/// 
+/// #[derive(Inject)]
+/// # pub
+/// struct SimpleStruct {
+///     data: u32
+/// }
+/// 
+/// impl SimpleStruct {
+///     fn new(data: u32) -> Self {
+///         Self { data }
+///     }
+/// }
+///
+/// impl Priv for SimpleStruct {}
+///
+/// #[derive(Provide)]
+/// #[coi(provides dyn Priv with SimpleStruct::new(self.data))]
+/// struct SimpleStructProvider {
+///     data: u32,
+/// }
+/// 
+/// impl SimpleStructProvider {
+///     fn new(data: u32) -> Self {
+///         Self { data: 42 }
+///     }
+/// }
 /// ```
 #[proc_macro_derive(Provide, attributes(coi))]
 pub fn provide_derive(input: TokenStream) -> TokenStream {
