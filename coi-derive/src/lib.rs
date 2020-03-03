@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Coi-derive simplifies implementing the traits provided in the [coi] crate.
 //!
 //! [coi]: https://docs.rs/coi

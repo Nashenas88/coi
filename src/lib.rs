@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Coi provides an easy to use dependency injection framework.
 //! Currently, this crate provides the following:
 //! - **[`coi::Inject` (trait)]** - a marker trait that indicates a trait or struct is injectable.
