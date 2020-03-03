@@ -526,7 +526,7 @@ struct InnerContainer {
     resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
     parent: Option<Container>,
     #[cfg(feature = "debug")]
-    dependency_map: HashMap<String, Vec<&'static str>>,
+    dependency_map: HashMap<String, &'static [&'static str]>,
 }
 
 impl InnerContainer {
@@ -769,7 +769,7 @@ impl Container {
 pub struct ContainerBuilder {
     provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
     #[cfg(feature = "debug")]
-    dependency_map: HashMap<String, Vec<&'static str>>,
+    dependency_map: HashMap<String, &'static [&'static str]>,
 }
 
 impl ContainerBuilder {
@@ -859,7 +859,42 @@ pub trait Provide {
 
     /// Return list of dependencies
     #[cfg(feature = "debug")]
-    fn dependencies(&self) -> Vec<&'static str>;
+    fn dependencies(&self) -> &'static [&'static str];
+}
+
+impl<T, F> Provide for F
+where
+    F: Fn(&Container) -> Result<Arc<T>>,
+    T: Inject + ?Sized,
+{
+    type Output = T;
+
+    fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
+        self(container)
+    }
+
+    // TODO(pfaria): Hmmm....
+    #[cfg(feature = "debug")]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &[]
+    }
+}
+
+impl<T> Provide for dyn Fn(&Container) -> Result<Arc<T>>
+where
+    T: Inject + ?Sized,
+{
+    type Output = T;
+
+    fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
+        self(container)
+    }
+
+    // TODO(pfaria): Hmmm....
+    #[cfg(feature = "debug")]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &[]
+    }
 }
 
 /// A macro to simplify building of `Container`s.
@@ -880,9 +915,9 @@ pub trait Provide {
 ///
 /// let mut container = container! {
 ///     dep => ImplProvider,
-///     transient_dep => ImplProvider.transient,
-///     singleton_dep => ImplProvider.singleton,
-///     scoped_dep => ImplProvider.scoped
+///     transient_dep => ImplProvider; transient,
+///     singleton_dep => ImplProvider; singleton,
+///     scoped_dep => ImplProvider; scoped
 /// };
 /// ```
 ///
@@ -891,40 +926,40 @@ pub trait Provide {
 /// [`coi::Registration`]: enum.Registration.html
 #[macro_export]
 macro_rules! container {
-    (@registration $provider:ident scoped) => {
+    (@registration $provider:expr; scoped) => {
         $crate::Registration::new(
             $crate::RegistrationKind::Scoped,
             $provider
         )
     };
-    (@registration $provider:ident singleton) => {
+    (@registration $provider:expr; singleton) => {
         $crate::Registration::new(
             $crate::RegistrationKind::Singleton,
             $provider
         )
     };
-    (@registration $provider:ident transient) => {
+    (@registration $provider:expr; transient) => {
         $crate::Registration::new(
             $crate::RegistrationKind::Transient,
             $provider
         )
     };
-    (@registration $provider:ident) => {
+    (@registration $provider:expr) => {
         $crate::Registration::new(
             $crate::RegistrationKind::Transient,
             $provider
         )
     };
-    (@line $builder:ident $key:ident $provider:ident $($call:ident)?) => {
-        $builder = $builder.register_as(stringify!($key), container!(@registration $provider $($call)?));
+    (@line $builder:ident $key:ident $provider:expr $(; $call:ident)?) => {
+        $builder = $builder.register_as(stringify!($key), container!(@registration $provider $(; $call)?));
     };
-    ($($key:ident => $provider:ident $(. $call:ident)?),+) => {
-        container!{ $( $key => $provider $(. $call)?, )+ }
+    ($($key:ident => $provider:expr $(; $call:ident)?),+) => {
+        container!{ $( $key => $provider $(; $call)?, )+ }
     };
-    ($($key:ident => $provider:ident $(. $call:ident)?,)+) => {
+    ($($key:ident => $provider:expr $(; $call:ident)?,)+) => {
         {
             let mut builder = ::coi::ContainerBuilder::new();
-            $(container!(@line builder $key $provider $($call)?);)+
+            $(container!(@line builder $key $provider $(; $call)?);)+
             builder.build()
         }
     }

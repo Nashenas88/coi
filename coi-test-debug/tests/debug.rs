@@ -63,9 +63,9 @@ impl Trait5 for Impl5 {}
 fn main() {
     let container = container! {
         trait1 => Impl1Provider,
-        trait2 => Impl2Provider.scoped,
+        trait2 => Impl2Provider; scoped,
         trait3 => Impl3Provider,
-        trait4 => Impl4Provider.singleton,
+        trait4 => Impl4Provider; singleton,
         trait5 => Impl5Provider,
     };
     let debugged = format!("{:?}", container);
