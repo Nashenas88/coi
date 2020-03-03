@@ -222,8 +222,8 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 
     let dependencies_fn = if cfg!(feature = "debug") {
         vec![quote! {
-            fn dependencies(&self) -> Vec<&'static str> {
-                vec![
+            fn dependencies(&self) -> &'static[&'static str] {
+                &[
                     #( #keys, )*
                 ]
             }

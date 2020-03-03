@@ -52,7 +52,7 @@ fn transient_registration_always_returns_new_instance() {
 #[test]
 fn singleton_registration_always_returns_same_instance_even_when_scoped() {
     let container = container! {
-        dep1 => Impl1Provider.singleton
+        dep1 => Impl1Provider; singleton
     };
 
     let dep1_0 = container.resolve::<dyn Dep1>("dep1").unwrap();
@@ -78,8 +78,8 @@ fn singleton_registration_always_returns_same_instance_even_when_scoped() {
 #[test]
 fn scoped_registration_always_returns_same_instance_within_same_scope() {
     let container = container! {
-        dep1 => Impl1Provider.singleton,
-        dep2 => Impl2Provider.scoped
+        dep1 => Impl1Provider; singleton,
+        dep2 => Impl2Provider; scoped
     };
 
     let dep2_0 = container.resolve::<dyn Dep2>("dep2").unwrap();
@@ -204,9 +204,9 @@ impl Dep3 for Impl3 {
 fn scoped_registration_provides_same_instance_regardless_of_nesting_order() {
     let unique_provider = UniqueProvider::new();
     let container = container! {
-        id => unique_provider.scoped,
-        hold => HolderProvider.transient,
-        dep3 => Impl3Provider.scoped,
+        id => unique_provider; scoped,
+        hold => HolderProvider; transient,
+        dep3 => Impl3Provider; scoped,
     };
     let scoped_container = container.scoped();
     let dep3 = scoped_container.resolve::<dyn Dep3>("dep3").unwrap();
