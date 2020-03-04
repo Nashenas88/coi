@@ -862,6 +862,7 @@ pub trait Provide {
     fn dependencies(&self) -> &'static [&'static str];
 }
 
+#[cfg(not(feature = "debug"))]
 impl<T, F> Provide for F
 where
     F: Fn(&Container) -> Result<Arc<T>>,
@@ -872,14 +873,9 @@ where
     fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
         self(container)
     }
-
-    // TODO(pfaria): Hmmm....
-    #[cfg(feature = "debug")]
-    fn dependencies(&self) -> &'static [&'static str] {
-        &[]
-    }
 }
 
+#[cfg(not(feature = "debug"))]
 impl<T> Provide for dyn Fn(&Container) -> Result<Arc<T>>
 where
     T: Inject + ?Sized,
@@ -889,11 +885,42 @@ where
     fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
         self(container)
     }
+}
 
-    // TODO(pfaria): Hmmm....
-    #[cfg(feature = "debug")]
+#[cfg(featuer = "debug")]
+impl<T, F> Provide for (&'static [&'static str], F)
+where
+    F: Fn(&Container) -> Result<Arc<T>>,
+    T: Inject + ?Sized,
+{
+    type Output = T;
+
+    fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
+        (self.1)(container)
+    }
+
     fn dependencies(&self) -> &'static [&'static str] {
-        &[]
+        self.0
+    }
+}
+
+#[cfg(feature = "debug")]
+impl<T> Provide
+    for (
+        &'static [&'static str],
+        dyn Fn(&Container) -> Result<Arc<T>>,
+    )
+where
+    T: Inject + ?Sized,
+{
+    type Output = T;
+
+    fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
+        (self.1)(container)
+    }
+
+    fn dependencies(&self) -> &'static [&'static str] {
+        self.0
     }
 }
 
@@ -963,6 +990,53 @@ macro_rules! container {
             builder.build()
         }
     }
+}
+
+/// Helper macro to ease use of "debug" feature when providing closures
+#[macro_export]
+macro_rules! provide_closure {
+    // Support any comma format
+    ($($move:ident)? |$($arg:ident: Arc<$ty:ty>),*| $(-> $res:ty)? $block:block) => {
+        provide_closure!($($move)? |$($arg: Arc<$ty>,)*| $(-> $res)? $block)
+    };
+    // actual macro
+    ($($move:ident)? |$($arg:ident: Arc<$ty:ty>,)*| $(-> $res:ty)? $block:block) => {
+        {
+            use $crate::__provide_closure_impl;
+            __provide_closure_impl!($($move)? |$($arg: $ty,)*| $(-> $res)? $block)
+        }
+    };
+    // handle case of missing argument types
+    ($($move:ident)? |$($arg:ident),*| $(-> $res:ty)? $block:block) => {
+        compile_error!("this macro requires closure arguments to have explicitly defined parameter types")
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+#[cfg(not(feature = "debug"))]
+macro_rules! __provide_closure_impl {
+    ($($move:ident)? |$($arg:ident: $ty:ty,)*| $(-> $res:ty)? $block:block) => {
+        $($move)? |_container: &$crate::Container| $(-> $res)? {
+            $(let $arg = _container.resolve::<$ty>(stringify!($arg))?;)*
+            $block
+        }
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+#[cfg(feature = "debug")]
+macro_rules! __provide_closure_impl {
+    ($($move:ident)? |$($arg:ident: $ty:ty,)*| $(-> $res:ty)? $block:block) => {
+        (
+            &[$(stringify!($arg),)*],
+            $($move)? |_container: &$crate::Container| $(-> $res)? {
+                $(let $arg = _container.resolve::<$ty>(stringify!($arg))?;)*
+                $block
+            }
+        )
+    };
 }
 
 #[cfg(test)]
