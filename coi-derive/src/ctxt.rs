@@ -6,7 +6,9 @@ pub struct Ctxt {
 
 impl Ctxt {
     pub fn new() -> Self {
-        Ctxt { errors: RefCell::new(vec![]) }
+        Ctxt {
+            errors: RefCell::new(vec![]),
+        }
     }
 
     pub fn push(&self, err: syn::Error) {

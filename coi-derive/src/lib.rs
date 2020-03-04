@@ -32,7 +32,7 @@ use crate::ctxt::Ctxt;
 /// be useful if you have multiple trait implementations for one struct and want to provide separate
 /// unique instances for each trait in the container. That use case might be more common with mocks
 /// in unit tests rather than in production code.
-/// 
+///
 /// It generates a provider struct with visibility `<vis>`
 /// that impls `Provide` with an output type of `Arc<<ty>>`. It will construct `<ty>` with `<expr>`,
 /// and all params to `<expr>` must match the struct fields marked with `#[coi(inject)]` (see the
@@ -156,7 +156,7 @@ use crate::ctxt::Ctxt;
 /// If you need some form of constructor fn that takes arguments that are not injected, then you
 /// might be able to use the [`coi::Provide`] derive. If that doesn't fit your use case, you'll
 /// need to manually implement `Provide`.
-/// 
+///
 /// [`coi::Provide`]: derive.Provide.html
 #[proc_macro_derive(Inject, attributes(coi))]
 pub fn inject_derive(input: TokenStream) -> TokenStream {
@@ -315,10 +315,10 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 /// ```rust,ignore
 /// #[coi(provides <vis> <ty> with <expr>)]
 /// ```
-/// 
+///
 /// Multiple `provides` attributes are not allowed since this is for a specific `Provide` impl and
 /// not for the resolved type.
-/// 
+///
 /// It generates a provider struct with visibility `<vis>`
 /// that impls `Provide` with an output type of `Arc<<ty>>`. It will construct `<ty>` with `<expr>`,
 /// and all params to `<expr>` must match the struct fields marked with `#[coi(inject)]` (see the
@@ -333,13 +333,13 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 /// use coi::{Inject, Provide};
 /// # use coi_derive::{Inject, Provide};
 /// trait Priv: Inject {}
-/// 
+///
 /// #[derive(Inject)]
 /// # pub
 /// struct SimpleStruct {
 ///     data: u32
 /// }
-/// 
+///
 /// impl SimpleStruct {
 ///     fn new(data: u32) -> Self {
 ///         Self { data }
@@ -353,7 +353,7 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
 /// struct SimpleStructProvider {
 ///     data: u32,
 /// }
-/// 
+///
 /// impl SimpleStructProvider {
 ///     fn new(data: u32) -> Self {
 ///         Self { data: 42 }
