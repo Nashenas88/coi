@@ -23,7 +23,7 @@ pub trait Trait1: Inject {
 
 // derive `Inject` on all structs that will provide the implementation
 #[derive(Inject)]
-#[provides(dyn Trait1 with Impl1)]
+#[coi(provides dyn Trait1 with Impl1)]
 struct Impl1;
 
 // actually impl the trait
@@ -38,10 +38,10 @@ pub trait Trait2: Inject {
 }
 
 #[derive(Inject)]
-#[provides(dyn Trait2 with Impl2::new(trait1))]
+#[coi(provides dyn Trait2 with Impl2::new(trait1))]
 struct Impl2 {
     // inject dependencies by Arc<dyn SomeTrait>
-    #[inject]
+    #[coi(inject)]
     trait1: Arc<dyn Trait1>,
 }
 
@@ -59,15 +59,15 @@ impl Trait2 for Impl2 {
 
 // It even works on structs
 #[derive(Debug, Inject)]
-#[provides(JustAStruct with JustAStruct)]
+#[coi(provides JustAStruct with JustAStruct)]
 pub struct JustAStruct;
 
 fn main() {
     // Then construct your container with the helper `container!` macro
     let container = container!{
         trait1 => Impl1Provider,
-        trait2 => Impl2Provider.scoped,
-        struct => JustAStructProvider.singleton
+        trait2 => Impl2Provider; scoped,
+        struct => JustAStructProvider; singleton
     };
 
     // And resolve away!
