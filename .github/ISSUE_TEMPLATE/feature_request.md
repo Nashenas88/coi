@@ -1,3 +1,12 @@
+---
+name: Feature request
+about: Suggest an idea for this project
+title: ''
+labels: ''
+assignees: ''
+
+---
+
 <!---
     Hopefully, this doesn't come across as too intimidating, but it would
     be really appreciated if you could fill out this template when
