@@ -65,9 +65,9 @@ pub struct JustAStruct;
 fn main() {
     // Then construct your container with the helper `container!` macro
     let container = container!{
-        trait1 => Impl1,
-        trait2 => Impl2.scoped,
-        struct => JustAStruct.singleton
+        trait1 => Impl1Provider,
+        trait2 => Impl2Provider.scoped,
+        struct => JustAStructProvider.singleton
     };
 
     // And resolve away!
