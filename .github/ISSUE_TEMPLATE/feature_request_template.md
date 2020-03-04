@@ -4,20 +4,21 @@
     requesting a new feature. Thank you!
 --->
 
-**What**
+## What
 <!---
     Should be a summary of the change
 --->
 
-**Why**
+## Why
 <!---
     Why do you think this will be an improvement to the crate?
 --->
 
-**Examples**
+## Examples
 <!---
     Could you provide any examples of what the new api would look like
     in practice?
 --->
 
+## Checklist
 - [ ] Would this be a breaking change?

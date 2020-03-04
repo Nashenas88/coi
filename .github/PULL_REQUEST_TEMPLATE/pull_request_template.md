@@ -6,20 +6,21 @@
     could be filled out.
 --->
 
-**What**
+## What
 <!---
     Add a brief summary of your change.
 --->
 
-**Why**
+## Why
 <!---
     Add a detailed explanation of why this change would be needed
 --->
 
-**How**
+## How
 <!---
     Explain how your change is implemented and how it achieves
     the "Why" above
 --->
 
+## Checks
 - [ ] Did you run `make fmt` as a final commit?
