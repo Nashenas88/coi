@@ -6,7 +6,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput, Error};
+use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Type};
 
 mod attr;
 mod ctxt;
@@ -274,8 +274,14 @@ pub fn inject_derive(input: TokenStream) -> TokenStream {
         .map(|p| {
             let provider = p.name_or(&input_ident);
             let vis = p.vis;
-            let ty = p.ty;
             let provides_with = p.with;
+
+            let ty = match p.ty {
+                Type::TraitObject(ty) => {
+                    Type::TraitObject(parse_quote!{#ty + ::std::marker::Send + ::std::marker::Sync + 'static})
+                },
+                _ => p.ty,
+            };
 
             quote! {
                 #vis struct #provider #generics #provider_fields #where_clause;
@@ -408,8 +414,14 @@ pub fn provide_derive(input: TokenStream) -> TokenStream {
         .providers
         .into_iter()
         .map(|p| {
-            let ty = p.ty;
             let provides_with = p.with;
+
+            let ty = match p.ty {
+                Type::TraitObject(ty) => {
+                    Type::TraitObject(parse_quote!{#ty + ::std::marker::Send + ::std::marker::Sync + 'static})
+                },
+                _ => p.ty,
+            };
             quote! {
                 impl #generics #coi::Provide for #provider #generics #where_clause {
                     type Output = #ty;

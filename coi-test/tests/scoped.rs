@@ -1,4 +1,4 @@
-use coi::{container, Container, Inject, Provide};
+use coi::{container, injectable, Container, Inject, Provide};
 use std::{
     ops::Deref,
     sync::{
@@ -7,8 +7,8 @@ use std::{
     },
 };
 
-trait Dep1: Inject {}
-trait Dep2: Inject {}
+trait Dep1 {}
+trait Dep2 {}
 
 #[derive(Inject)]
 #[coi(provides Impl0 with Impl0)]
@@ -23,11 +23,11 @@ struct Impl1;
 #[coi(provides dyn Dep2 with Impl2::new(dep1))]
 struct Impl2 {
     #[coi(inject)]
-    dep1: Arc<dyn Dep1>,
+    dep1: Arc<dyn Dep1 + Send + Sync + 'static>,
 }
 
 impl Impl2 {
-    fn new(dep1: Arc<dyn Dep1>) -> Self {
+    fn new(dep1: injectable!(dyn Dep1)) -> Self {
         Self { dep1 }
     }
 }
@@ -55,15 +55,15 @@ fn singleton_registration_always_returns_same_instance_even_when_scoped() {
         dep1 => Impl1Provider; singleton
     };
 
-    let dep1_0 = container.resolve::<dyn Dep1>("dep1").unwrap();
-    let dep1_1 = container.resolve::<dyn Dep1>("dep1").unwrap();
+    let dep1_0 = container.resolve::<dyn Dep1 + Send + Sync + 'static>("dep1").unwrap();
+    let dep1_1 = container.resolve::<dyn Dep1 + Send + Sync + 'static>("dep1").unwrap();
     assert_eq!(
         dep1_0.deref() as &dyn Dep1 as *const _,
         dep1_1.deref() as &dyn Dep1 as *const _
     );
     {
         let scoped_container = container.scoped();
-        let dep1_2 = scoped_container.resolve::<dyn Dep1>("dep1").unwrap();
+        let dep1_2 = scoped_container.resolve::<dyn Dep1 + Send + Sync + 'static>("dep1").unwrap();
         assert_eq!(
             dep1_0.deref() as &dyn Dep1 as *const _,
             dep1_1.deref() as &dyn Dep1 as *const _
@@ -82,16 +82,16 @@ fn scoped_registration_always_returns_same_instance_within_same_scope() {
         dep2 => Impl2Provider; scoped
     };
 
-    let dep2_0 = container.resolve::<dyn Dep2>("dep2").unwrap();
-    let dep2_1 = container.resolve::<dyn Dep2>("dep2").unwrap();
+    let dep2_0 = container.resolve::<dyn Dep2 + Send + Sync + 'static>("dep2").unwrap();
+    let dep2_1 = container.resolve::<dyn Dep2 + Send + Sync + 'static>("dep2").unwrap();
     assert_eq!(
         dep2_0.deref() as &dyn Dep2 as *const _,
         dep2_1.deref() as &dyn Dep2 as *const _
     );
     {
         let scoped_container = container.scoped();
-        let dep2_2 = scoped_container.resolve::<dyn Dep2>("dep2").unwrap();
-        let dep2_3 = scoped_container.resolve::<dyn Dep2>("dep2").unwrap();
+        let dep2_2 = scoped_container.resolve::<dyn Dep2 + Send + Sync + 'static>("dep2").unwrap();
+        let dep2_3 = scoped_container.resolve::<dyn Dep2 + Send + Sync + 'static>("dep2").unwrap();
         assert_ne!(
             dep2_0.deref() as &dyn Dep2 as *const _,
             dep2_2.deref() as &dyn Dep2 as *const _
@@ -115,15 +115,13 @@ fn scoped_registration_always_returns_same_instance_within_same_scope() {
     }
 }
 
-trait Id: Inject {
+trait Id {
     fn id(&self) -> usize;
 }
 
 struct Unique {
     id: usize,
 }
-
-impl Inject for Unique {}
 
 impl Id for Unique {
     fn id(&self) -> usize {
@@ -144,15 +142,15 @@ impl UniqueProvider {
 }
 
 impl Provide for UniqueProvider {
-    type Output = dyn Id;
+    type Output = dyn Id + Send + Sync + 'static;
 
     fn provide(&self, _: &Container) -> coi::Result<Arc<Self::Output>> {
         let count = self.count.fetch_add(1, Ordering::Relaxed);
-        Ok(Arc::new(Unique { id: count }) as Arc<dyn Id>)
+        Ok(Arc::new(Unique { id: count }) as injectable!(dyn Id))
     }
 }
 
-trait Hold: Inject {
+trait Hold {
     fn get_id(&self) -> usize;
 }
 
@@ -160,11 +158,11 @@ trait Hold: Inject {
 #[coi(provides dyn Hold with Holder::new(id))]
 struct Holder {
     #[coi(inject)]
-    id: Arc<dyn Id>,
+    id: Arc<dyn Id + Send + Sync + 'static>,
 }
 
 impl Holder {
-    fn new(id: Arc<dyn Id>) -> Self {
+    fn new(id: injectable!(dyn Id)) -> Self {
         Self { id }
     }
 }
@@ -175,7 +173,7 @@ impl Hold for Holder {
     }
 }
 
-trait Dep3: Inject {
+trait Dep3 {
     fn get_ids(&self) -> (usize, usize);
 }
 
@@ -183,13 +181,13 @@ trait Dep3: Inject {
 #[coi(provides dyn Dep3 with Impl3::new(id, hold))]
 struct Impl3 {
     #[coi(inject)]
-    id: Arc<dyn Id>,
+    id: Arc<dyn Id + Send + Sync + 'static>,
     #[coi(inject)]
-    hold: Arc<dyn Hold>,
+    hold: Arc<dyn Hold + Send + Sync + 'static>,
 }
 
 impl Impl3 {
-    fn new(id: Arc<dyn Id>, hold: Arc<dyn Hold>) -> Self {
+    fn new(id: injectable!(dyn Id), hold: injectable!(dyn Hold)) -> Self {
         Self { id, hold }
     }
 }
@@ -209,7 +207,7 @@ fn scoped_registration_provides_same_instance_regardless_of_nesting_order() {
         dep3 => Impl3Provider; scoped,
     };
     let scoped_container = container.scoped();
-    let dep3 = scoped_container.resolve::<dyn Dep3>("dep3").unwrap();
+    let dep3 = scoped_container.resolve::<dyn Dep3 + Send + Sync + 'static>("dep3").unwrap();
     let (id1, id2) = dep3.get_ids();
     assert_eq!(
         id1, id2,

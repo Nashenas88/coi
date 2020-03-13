@@ -1,52 +1,52 @@
-use coi::{container, Inject};
+use coi::{container, injectable, Inject};
 use std::sync::Arc;
 
-trait Trait1: Inject {}
+trait Trait1 {}
 #[derive(Inject)]
 #[coi(provides dyn Trait1 with Impl1)]
 struct Impl1;
 impl Trait1 for Impl1 {}
 
-trait Trait2: Inject {}
+trait Trait2 {}
 #[derive(Inject)]
 #[coi(provides dyn Trait2 with Impl2)]
 struct Impl2;
 impl Trait2 for Impl2 {}
 
-trait Trait3: Inject {}
+trait Trait3 {}
 #[derive(Inject)]
 #[coi(provides dyn Trait3 with Impl3)]
 struct Impl3;
 impl Trait3 for Impl3 {}
 
-trait Trait4: Inject {}
+trait Trait4 {}
 #[derive(Inject)]
 #[coi(provides dyn Trait4 with Impl4)]
 struct Impl4;
 impl Trait4 for Impl4 {}
 
-trait Trait5: Inject {}
+trait Trait5 {}
 
 #[allow(unused)]
 #[derive(Inject)]
 #[coi(provides dyn Trait5 with Impl5::new(trait1, trait2, trait3, trait4))]
 struct Impl5 {
     #[coi(inject)]
-    trait1: Arc<dyn Trait1>,
+    trait1: Arc<dyn Trait1 + Send + Sync + 'static>,
     #[coi(inject)]
-    trait2: Arc<dyn Trait2>,
+    trait2: Arc<dyn Trait2 + Send + Sync + 'static>,
     #[coi(inject)]
-    trait3: Arc<dyn Trait3>,
+    trait3: Arc<dyn Trait3 + Send + Sync + 'static>,
     #[coi(inject)]
-    trait4: Arc<dyn Trait4>,
+    trait4: Arc<dyn Trait4 + Send + Sync + 'static>,
 }
 
 impl Impl5 {
     fn new(
-        trait1: Arc<dyn Trait1>,
-        trait2: Arc<dyn Trait2>,
-        trait3: Arc<dyn Trait3>,
-        trait4: Arc<dyn Trait4>,
+        trait1: injectable!(dyn Trait1),
+        trait2: injectable!(dyn Trait2),
+        trait3: injectable!(dyn Trait3),
+        trait4: injectable!(dyn Trait4),
     ) -> Self {
         Self {
             trait1,

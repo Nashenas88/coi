@@ -1,4 +1,4 @@
-use coi::{container, Inject};
+use coi::{container, injectable, Inject};
 use std::sync::Arc;
 
 #[derive(Inject)]
@@ -16,5 +16,5 @@ fn main() {
         impl1 => Impl1Provider,
     };
     let impl1 = container.resolve::<Impl1>("impl1").expect("Should exist");
-    let _dep1: Arc<Dep1> = Arc::clone(&impl1.0);
+    let _dep1: injectable!(Dep1) = Arc::clone(&impl1.0);
 }

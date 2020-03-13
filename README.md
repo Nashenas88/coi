@@ -16,8 +16,8 @@ on as the crate matures.
 use coi::{container, Inject};
 use std::sync::Arc;
 
-// Inherit `Inject` on all traits you'd like to inject
-pub trait Trait1: Inject {
+// The trait you'd like to inject
+pub trait Trait1 {
     fn describe(&self) -> &'static str;
 }
 
@@ -33,7 +33,7 @@ impl Trait1 for Impl1 {
     }
 }
 
-pub trait Trait2: Inject {
+pub trait Trait2 {
     fn deep_describe(&self) -> String;
 }
 
@@ -42,11 +42,11 @@ pub trait Trait2: Inject {
 struct Impl2 {
     // inject dependencies by Arc<dyn SomeTrait>
     #[coi(inject)]
-    trait1: Arc<dyn Trait1>,
+    trait1: Arc<dyn Trait1 + Send + Sync + 'static>,
 }
 
 impl Impl2 {
-    fn new(trait1: Arc<dyn Trait1>) -> Self {
+    fn new(trait1: Arc<dyn Trait1 + Send + Sync + 'static>) -> Self {
         Self { trait1 }
     }
 }
@@ -72,7 +72,7 @@ fn main() {
 
     // And resolve away!
     let trait2 = container
-        .resolve::<dyn Trait2>("trait2")
+        .resolve::<dyn Trait2 + Send + Sync + 'static>("trait2")
         .expect("Should exist");
     println!("Deep description: {}", trait2.as_ref().deep_describe());
     let a_struct = container

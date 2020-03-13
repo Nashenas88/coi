@@ -25,8 +25,8 @@
 //! use coi::{container, Inject};
 //! use std::sync::Arc;
 //!
-//! // Mark injectable traits by inheriting the `Inject` trait.
-//! trait Trait1: Inject {
+//! // The trait you'd like to inject.
+//! trait Trait1 {
 //!     fn describe(&self) -> &'static str;
 //! }
 //!
@@ -45,8 +45,7 @@
 //!     }
 //! }
 //!
-//! // Mark injectable traits by inheriting the `Inject` trait.
-//! trait Trait2: Inject {
+//! trait Trait2 {
 //!     fn deep_describe(&self) -> String;
 //! }
 //!
@@ -105,28 +104,18 @@
 //!
 //! # How this crate works in more detail
 //!
-//! For any trait you wish to abstract over, have it inherit the `Inject` trait. For structs, impl
-//! `Inject` for that struct, e.g.
-//! ```rust
-//! # use coi::Inject;
-//! trait Trait1: Inject {}
-//!
-//! struct Struct1;
-//!
-//! impl Inject for Struct1 {}
-//! ```
-//!
-//! Then, in order to register the injectable item with the [`coi::ContainerBuilder`], you also
+//! In order to register an injectable item with the [`coi::ContainerBuilder`], you
 //! need a struct that impls `Provide<Output = T>` where `T` is your trait or struct. `Provide`
 //! exposes a `provide` fn that takes `&self` and `&Container`. When manually implementing `Provide`
 //! you must resolve all dependencies with `container`. Here's an example below:
 //!
 //! ```rust
-//! # use coi::{Container, Inject, Provide};
-//! # use std::sync::{Arc, Mutex};
-//! # trait Trait1: Inject {}
-//! #
-//! trait Dependency: Inject {}
+//! use coi::{Container, Inject, Provide};
+//! use std::sync::{Arc, Mutex};
+//!
+//! trait Trait1: Inject {}
+//!
+//! trait Dependency {}
 //!
 //! struct Impl1 {
 //!     dependency: Arc<dyn Dependency>,
@@ -137,8 +126,6 @@
 //!         Self { dependency }
 //!     }
 //! }
-//!
-//! impl Inject for Impl1 {}
 //!
 //! impl Trait1 for Impl1 {}
 //!
@@ -160,8 +147,6 @@
 //! ```rust
 //! # use coi::{container, Container, Inject, Provide};
 //! # use std::sync::Arc;
-//! # trait Trait1: Inject {}
-//! # trait Dependency: Inject {}
 //! #
 //! # struct Impl1 {
 //! #     dependency: Arc<dyn Dependency>,
@@ -171,7 +156,6 @@
 //! #         Self { dependency }
 //! #     }
 //! # }
-//! # impl Inject for Impl1 {}
 //! # impl Trait1 for Impl1 {}
 //! #
 //! # struct Trait1Provider;
@@ -186,8 +170,6 @@
 //! struct DepImpl;
 //!
 //! impl Dependency for DepImpl {}
-//!
-//! impl Inject for DepImpl {}
 //!
 //! struct DependencyProvider;
 //!
@@ -387,7 +369,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// A marker trait for injectable traits and structs.
 pub trait Inject: Send + Sync + 'static {}
 
-impl<T: Inject + ?Sized> Inject for Arc<T> {}
+impl<T: Send + Sync + ?Sized + 'static> Inject for Arc<T> {}
 
 /// Control when `Container` will call `Provide::provide`.
 #[derive(Copy, Clone, Debug)]
@@ -399,7 +381,7 @@ pub enum RegistrationKind {
     /// ```rust
     /// # use coi::{container, Inject, Result};
     /// # use std::ops::Deref;
-    /// # trait Trait: Inject {}
+    /// # trait Trait {}
     /// # #[derive(Inject)]
     /// # #[coi(provides dyn Trait with Impl)]
     /// # struct Impl;
@@ -430,7 +412,7 @@ pub enum RegistrationKind {
     /// ```rust
     /// # use coi::{container, Inject, Result};
     /// # use std::{ops::Deref, sync::{Arc, Mutex}};
-    /// # trait Trait: Inject {}
+    /// # trait Trait {}
     /// # #[derive(Inject)]
     /// # #[coi(provides dyn Trait with Impl)]
     /// # struct Impl;
@@ -470,7 +452,7 @@ pub enum RegistrationKind {
     /// ```rust
     /// # use coi::{container, Inject, Result};
     /// # use std::{ops::Deref, sync::{Arc, Mutex}};
-    /// # trait Trait: Inject {}
+    /// # trait Trait {}
     /// # #[derive(Inject)]
     /// # #[coi(provides dyn Trait with Impl)]
     /// # struct Impl;
@@ -532,7 +514,7 @@ struct InnerContainer {
 impl InnerContainer {
     fn check_resolved<T>(&self, key: &str) -> Option<Result<Arc<T>>>
     where
-        T: Inject + ?Sized,
+        T: Send + Sync + ?Sized + 'static,
     {
         self.resolved_map.get(key).map(|v| {
             v.downcast_ref::<Arc<T>>()
@@ -592,7 +574,7 @@ impl Container {
     /// Resolve an `Arc<T>` whose provider was previously registered with `key`.
     pub fn resolve<T>(&self, key: &str) -> Result<Arc<T>>
     where
-        T: Inject + ?Sized,
+        T: Send + Sync + ?Sized + 'static,
     {
         let (kind, provider) = {
             let container = self.0.lock().unwrap();
@@ -787,7 +769,7 @@ impl ContainerBuilder {
     pub fn register<K, P, T>(self, key: K, provider: P) -> Self
     where
         K: Into<String>,
-        T: Inject + ?Sized,
+        T: Send + Sync + ?Sized + 'static,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
         self.register_as(
@@ -798,7 +780,7 @@ impl ContainerBuilder {
 
     fn get_arc<P, T>(provider: P) -> Arc<dyn Provide<Output = T> + Send + Sync>
     where
-        T: Inject + ?Sized,
+        T: Send + Sync + ?Sized + 'static,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
         Arc::new(provider)
@@ -809,7 +791,7 @@ impl ContainerBuilder {
     pub fn register_as<K, P, T>(mut self, key: K, registration: Registration<P>) -> Self
     where
         K: Into<String>,
-        T: Inject + ?Sized,
+        T: Send + Sync + ?Sized + 'static,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
         let key = key.into();
@@ -852,7 +834,7 @@ pub trait Provide {
     /// The type that this provider will produce when resolved from a [`Container`].
     ///
     /// [`Container`]: struct.Container.html
-    type Output: Inject + ?Sized;
+    type Output: Send + Sync + ?Sized + 'static;
 
     /// Only intended to be used internally
     fn provide(&self, container: &Container) -> Result<Arc<Self::Output>>;
@@ -866,7 +848,7 @@ pub trait Provide {
 impl<T, F> Provide for F
 where
     F: Fn(&Container) -> Result<Arc<T>>,
-    T: Inject + ?Sized,
+    T: Send + Sync + ?Sized + 'static,
 {
     type Output = T;
 
@@ -878,7 +860,7 @@ where
 #[cfg(not(feature = "debug"))]
 impl<T> Provide for dyn Fn(&Container) -> Result<Arc<T>>
 where
-    T: Inject + ?Sized,
+    T: Send + Sync + ?Sized + 'static,
 {
     type Output = T;
 
@@ -891,7 +873,7 @@ where
 impl<T, F> Provide for (&'static [&'static str], F)
 where
     F: Fn(&Container) -> Result<Arc<T>>,
-    T: Inject + ?Sized,
+    T: Send + Sync + ?Sized + 'static,
 {
     type Output = T;
 
@@ -911,7 +893,7 @@ impl<T> Provide
         dyn Fn(&Container) -> Result<Arc<T>>,
     )
 where
-    T: Inject + ?Sized,
+    T: Send + Sync + ?Sized + 'static,
 {
     type Output = T;
 
@@ -1037,6 +1019,22 @@ macro_rules! __provide_closure_impl {
             }
         )
     };
+}
+
+/// A macro to simplify specifying injectable type
+/// TODO(pfaria) provide examples
+#[macro_export]
+macro_rules! injectable {
+    // Traits should have dyn anyways, so we know it's ok to
+    // add extra bounds
+    (dyn $ty:ident) => {
+        ::std::sync::Arc<dyn $ty + ::std::marker::Send + ::std::marker::Sync + 'static>
+    };
+    // Regular types should already have the auto traits, no
+    // way to specify bounds
+    ($ty:ty) => {
+        ::std::sync::Arc<$ty>
+    }
 }
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 use coi::{container, Inject};
 
-pub trait Trait1: Inject {
+pub trait Trait1 {
     fn a(&self) -> &'static str;
 }
 
-pub trait Trait2: Inject {
+pub trait Trait2 {
     fn b(&self) -> &'static str;
 }
 
@@ -31,9 +31,9 @@ fn main() {
         trait2 => ImplTrait2Provider,
     };
     let _trait1 = container
-        .resolve::<dyn Trait1>("trait1")
+        .resolve::<dyn Trait1 + Send + Sync + 'static>("trait1")
         .expect("Trait1 should exist");
     let _trait2 = container
-        .resolve::<dyn Trait2>("trait2")
+        .resolve::<dyn Trait2 + Send + Sync + 'static>("trait2")
         .expect("Trait2 should exist");
 }
