@@ -1,3 +1,4 @@
+#![feature(trait_alias)]
 #![deny(missing_docs)]
 //! Coi provides an easy to use dependency injection framework.
 //! Currently, this crate provides the following:
@@ -385,9 +386,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A marker trait for injectable traits and structs.
-pub trait Inject: Send + Sync + 'static {}
-
-impl<T: Inject + ?Sized> Inject for Arc<T> {}
+pub trait Inject = Send + Sync + 'static;
 
 /// Control when `Container` will call `Provide::provide`.
 #[derive(Copy, Clone, Debug)]
