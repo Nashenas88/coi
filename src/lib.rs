@@ -522,15 +522,15 @@ impl<T> Registration<T> {
 
 #[derive(Clone, Debug)]
 struct InnerContainer {
-    provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
-    resolved_map: HashMap<String, Arc<dyn Any + Send + Sync>>,
+    provider_map: HashMap<&'static str, Registration<Arc<dyn Any + Send + Sync>>>,
+    resolved_map: HashMap<&'static str, Arc<dyn Any + Send + Sync>>,
     parent: Option<Container>,
     #[cfg(feature = "debug")]
-    dependency_map: HashMap<String, &'static [&'static str]>,
+    dependency_map: HashMap<&'static str, &'static [&'static str]>,
 }
 
 impl InnerContainer {
-    fn check_resolved<T>(&self, key: &str) -> Option<Result<Arc<T>>>
+    fn check_resolved<T>(&self, key: &'static str) -> Option<Result<Arc<T>>>
     where
         T: Inject + ?Sized,
     {
@@ -557,17 +557,17 @@ pub enum AnalysisError {
     // manually calling petgraph::visit::depth_first_search
     /// There is a cyclic dependency within the container
     #[error("Cycle detected at node `{0}`")]
-    Cycle(String),
+    Cycle(&'static str),
     /// There is a missing dependency. Param 0 depends on Param 1, and Param 1 is missing.
     #[error("Node `{0}` depends on `{1}`, the latter of which is not registered")]
-    Missing(String, String),
+    Missing(&'static str, &'static str),
 }
 
 #[cfg(feature = "debug")]
 #[derive(Clone, Default)]
 struct AnalysisNode {
     registration: Option<RegistrationKind>,
-    id: String,
+    id: &'static str,
 }
 
 #[cfg(feature = "debug")]
@@ -590,7 +590,7 @@ impl Container {
     }
 
     /// Resolve an `Arc<T>` whose provider was previously registered with `key`.
-    pub fn resolve<T>(&self, key: &str) -> Result<Arc<T>>
+    pub fn resolve<T>(&self, key: &'static str) -> Result<Arc<T>>
     where
         T: Inject + ?Sized,
     {
@@ -638,7 +638,7 @@ impl Container {
                 // no one else already inserted into the resolved map (hence the call to entry).
                 Ok(container
                     .resolved_map
-                    .entry(key.to_owned())
+                    .entry(key)
                     .or_insert(Arc::new(provided?))
                     .downcast_ref::<Arc<T>>()
                     .map(Arc::clone)
@@ -682,11 +682,11 @@ impl Container {
         let mut key_to_node = container
             .dependency_map
             .iter()
-            .map(|(k, _)| -> (&str, NodeIndex) {
+            .map(|(k, _)| -> (&'static str, NodeIndex) {
                 let kind = container.provider_map[k].kind;
                 let n = graph.add_node(AnalysisNode {
                     registration: Some(kind),
-                    id: k.to_owned(),
+                    id: k,
                 });
                 (k, n)
             })
@@ -701,7 +701,7 @@ impl Container {
                         None => {
                             let vn = graph.add_node(AnalysisNode {
                                 registration: None,
-                                id: (*dep).to_owned(),
+                                id: dep,
                             });
                             key_to_node.insert(dep, vn);
                             key_to_node[dep]
@@ -733,7 +733,7 @@ impl Container {
                 let to = &graph[i].id;
                 graph
                     .neighbors_directed(i, Direction::Incoming)
-                    .map(|from| AnalysisError::Missing(graph[from].id.clone(), to.clone()))
+                    .map(|from| AnalysisError::Missing(graph[from].id, to))
                     .collect::<Vec<_>>()
             })
             .flatten()
@@ -741,7 +741,7 @@ impl Container {
 
         // Do any cycles exist?
         if let Err(cycle) = toposort(&graph, None) {
-            errors.push(AnalysisError::Cycle(graph[cycle.node_id()].id.clone()));
+            errors.push(AnalysisError::Cycle(graph[cycle.node_id()].id));
         }
 
         if errors.len() > 0 {
@@ -767,9 +767,9 @@ impl Container {
 /// A builder used to construct a `Container`.
 #[derive(Clone, Default)]
 pub struct ContainerBuilder {
-    provider_map: HashMap<String, Registration<Arc<dyn Any + Send + Sync>>>,
+    provider_map: HashMap<&'static str, Registration<Arc<dyn Any + Send + Sync>>>,
     #[cfg(feature = "debug")]
-    dependency_map: HashMap<String, &'static [&'static str]>,
+    dependency_map: HashMap<&'static str, &'static [&'static str]>,
 }
 
 impl ContainerBuilder {
@@ -784,9 +784,8 @@ impl ContainerBuilder {
 
     /// Register a `Provider` for `T` with identifier `key`.
     #[inline]
-    pub fn register<K, P, T>(self, key: K, provider: P) -> Self
+    pub fn register<P, T>(self, key: &'static str, provider: P) -> Self
     where
-        K: Into<String>,
         T: Inject + ?Sized,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
@@ -806,13 +805,11 @@ impl ContainerBuilder {
 
     /// Register a `Provider` for `T` with identifier `key`, while also specifying the resolution
     /// behavior.
-    pub fn register_as<K, P, T>(mut self, key: K, registration: Registration<P>) -> Self
+    pub fn register_as<P, T>(mut self, key: &'static str, registration: Registration<P>) -> Self
     where
-        K: Into<String>,
         T: Inject + ?Sized,
         P: Provide<Output = T> + Send + Sync + 'static,
     {
-        let key = key.into();
         #[cfg(feature = "debug")]
         let deps = registration.provider.dependencies();
         self.provider_map.insert(

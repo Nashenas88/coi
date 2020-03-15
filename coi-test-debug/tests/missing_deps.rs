@@ -46,11 +46,11 @@ fn validate_missing() {
     assert!(res.is_err());
     let errors = res.unwrap_err();
     assert!(errors.iter().any(|e| match e {
-        AnalysisError::Missing(from, to) => from == "t1" && to == "t3",
+        AnalysisError::Missing(from, to) => *from == "t1" && *to == "t3",
         _ => false,
     }));
     assert!(errors.iter().any(|e| match e {
-        AnalysisError::Missing(from, to) => from == "t2" && to == "t3",
+        AnalysisError::Missing(from, to) => *from == "t2" && *to == "t3",
         _ => false,
     }));
 }
