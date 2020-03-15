@@ -12,3 +12,6 @@ Cargo.lock
 .vscode
 .idea
 /coi-actix-sample/xtask/target/
+
+*.bench
+callgrind.out.*
