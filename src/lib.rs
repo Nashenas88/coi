@@ -658,7 +658,7 @@ impl Container {
                 .iter()
                 .filter_map(|(k, v)| match v.kind {
                     kind @ RegistrationKind::Scoped | kind @ RegistrationKind::Transient => Some((
-                        k.clone(),
+                        *k,
                         Registration {
                             kind,
                             provider: Arc::clone(&v.provider),
