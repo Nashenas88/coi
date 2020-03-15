@@ -353,7 +353,7 @@
 //! [tracking issue]: https://github.com/rust-lang/rust/issues/41875
 
 use std::any::Any;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::sync::{Arc, Mutex};
 
 #[cfg(any(feature = "derive", feature = "debug"))]
@@ -667,7 +667,7 @@ impl Container {
                     _ => None,
                 })
                 .collect(),
-            resolved_map: HashMap::new(),
+            resolved_map: HashMap::default(),
             // FIXME(pfaria) no clone here
             #[cfg(feature = "debug")]
             dependency_map: container.dependency_map.clone(),
@@ -776,9 +776,9 @@ impl ContainerBuilder {
     /// Constructor for `ContainerBuilder`.
     pub fn new() -> Self {
         Self {
-            provider_map: HashMap::new(),
+            provider_map: HashMap::default(),
             #[cfg(feature = "debug")]
-            dependency_map: HashMap::new(),
+            dependency_map: HashMap::default(),
         }
     }
 
@@ -836,7 +836,7 @@ impl ContainerBuilder {
     pub fn build(self) -> Container {
         Container::new(InnerContainer {
             provider_map: self.provider_map,
-            resolved_map: HashMap::new(),
+            resolved_map: HashMap::default(),
             parent: None,
             #[cfg(feature = "debug")]
             dependency_map: self.dependency_map,

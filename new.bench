@@ -1,0 +1,33 @@
+
+running 4 tests
+test test::conainer_builder_is_clonable ... ignored
+test test::container_is_clonable ... ignored
+test test::ensure_debug ... ignored
+test test::ensure_display ... ignored
+
+test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out
+
+
+running 19 tests
+test a_simple_resolve                                             ... bench:          79 ns/iter (+/- 4)
+test deeply_nested_scoped_dependencies                            ... bench:          43 ns/iter (+/- 2)
+test deeply_nested_singleton_dependencies                         ... bench:          39 ns/iter (+/- 2)
+test deeply_nested_transient_dependencies                         ... bench:      11,391 ns/iter (+/- 385)
+test doubly_scoped_container_deeply_nested_scoped_dependencies    ... bench:          42 ns/iter (+/- 1)
+test doubly_scoped_container_deeply_nested_singleton_dependencies ... bench:         141 ns/iter (+/- 7)
+test doubly_scoped_container_deeply_nested_transient_dependencies ... bench:      11,073 ns/iter (+/- 657)
+test doubly_scoped_container_wide_scoped_dependencies             ... bench:          39 ns/iter (+/- 0)
+test doubly_scoped_container_wide_singleton_dependencies          ... bench:         142 ns/iter (+/- 2)
+test doubly_scoped_container_wide_transient_dependencies          ... bench:      10,042 ns/iter (+/- 167)
+test scoped_container_deeply_nested_scoped_dependencies           ... bench:          39 ns/iter (+/- 0)
+test scoped_container_deeply_nested_singleton_dependencies        ... bench:          90 ns/iter (+/- 5)
+test scoped_container_deeply_nested_transient_dependencies        ... bench:      11,187 ns/iter (+/- 503)
+test scoped_container_wide_scoped_dependencies                    ... bench:          39 ns/iter (+/- 2)
+test scoped_container_wide_singleton_dependencies                 ... bench:          90 ns/iter (+/- 3)
+test scoped_container_wide_transient_dependencies                 ... bench:      10,228 ns/iter (+/- 202)
+test wide_scoped_dependencies                                     ... bench:          41 ns/iter (+/- 1)
+test wide_singleton_dependencies                                  ... bench:          39 ns/iter (+/- 2)
+test wide_transient_dependencies                                  ... bench:      10,207 ns/iter (+/- 260)
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 19 measured; 0 filtered out
+
