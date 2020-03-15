@@ -65,7 +65,7 @@ fn validate_cycle() {
     // unfortunately, the iteration is not deterministic, so we need to match
     // on any of the items that might be in the cycle
     assert!(errors.iter().any(|e| match e {
-        AnalysisError::Cycle(node) => node == "t1" || node == "t2" || node == "t3",
+        AnalysisError::Cycle(node) => *node == "t1" || *node == "t2" || *node == "t3",
         _ => false,
     }));
 }
