@@ -437,7 +437,7 @@ pub enum RegistrationKind {
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
     /// let container = container! {
-    ///     trait => ImplProvider.scoped
+    ///     trait => ImplProvider; scoped
     /// };
     ///
     /// // Every instance resolved within the same scope will be the same instance.
@@ -477,7 +477,7 @@ pub enum RegistrationKind {
     /// # impl Trait for Impl {}
     /// # fn the_test() -> Result<()> {
     /// let container = container! {
-    ///     trait => ImplProvider.singleton
+    ///     trait => ImplProvider; singleton
     /// };
     ///
     /// let instance_1 = container.resolve::<dyn Trait>("trait")?;
