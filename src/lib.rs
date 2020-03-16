@@ -352,8 +352,8 @@
 //! [`std::any::Any`]: https://doc.rust-lang.org/std/any/trait.Any.html
 //! [tracking issue]: https://github.com/rust-lang/rust/issues/41875
 
-use std::any::Any;
 use rustc_hash::FxHashMap as HashMap;
+use std::any::Any;
 use std::sync::{Arc, Mutex};
 
 #[cfg(any(feature = "derive", feature = "debug"))]
