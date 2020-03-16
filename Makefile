@@ -5,6 +5,8 @@ CRATES=$(dir $(wildcard **/Cargo.toml))
 
 define run_on_crates
 	failed=false; \
+	echo "<base>"; \
+	cargo $(1) $(EXTRA) || failed=true; \
 	for dir in $(CRATES); do \
 		echo "$$dir"; \
 		cd "$$dir"; \
