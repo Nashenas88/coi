@@ -19,5 +19,9 @@ default = ["derive"]
 derive = ["coi-derive"]
 debug = ["coi-derive/debug", "petgraph"]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [profile.bench]
 debug = true
