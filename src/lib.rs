@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! Coi provides an easy to use dependency injection framework.
 //! Currently, this crate provides the following:
 //! - **[`coi::Inject` (trait)]** - a marker trait that indicates a trait or struct is injectable.
@@ -550,6 +551,7 @@ pub struct Container(Arc<Mutex<InnerContainer>>);
 ///
 /// [`Container::analyze`]: struct.Container.html#method.analyze
 #[cfg(feature = "debug")]
+#[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
     // FIXME(pfaria), it would be better if we could trace the
@@ -723,6 +725,7 @@ impl Container {
     /// - Missing dependencies
     /// - Cyclic dependencies
     #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub fn analyze(&self) -> std::result::Result<(), Vec<AnalysisError>> {
         use petgraph::Direction;
         let graph = self.dependency_graph();
@@ -757,6 +760,7 @@ impl Container {
     /// [graphviz]: http://graphviz.org/
     /// [`dot` (pdf)]: https://graphviz.gitlab.io/_pages/pdf/dotguide.pdf
     #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub fn dot_graph(&self) -> String {
         use petgraph::dot::{Config, Dot};
         let graph = self.dependency_graph();
@@ -856,10 +860,12 @@ pub trait Provide {
 
     /// Return list of dependencies
     #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     fn dependencies(&self) -> &'static [&'static str];
 }
 
 #[cfg(not(feature = "debug"))]
+#[cfg_attr(docsrs, doc(cfg(not(feature = "debug"))))]
 impl<T, F> Provide for F
 where
     F: Fn(&Container) -> Result<Arc<T>>,
@@ -873,6 +879,7 @@ where
 }
 
 #[cfg(not(feature = "debug"))]
+#[cfg_attr(docsrs, doc(cfg(not(feature = "debug"))))]
 impl<T> Provide for dyn Fn(&Container) -> Result<Arc<T>>
 where
     T: Inject + ?Sized,
@@ -884,7 +891,8 @@ where
     }
 }
 
-#[cfg(featuer = "debug")]
+#[cfg(feature = "debug")]
+#[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
 impl<T, F> Provide for (&'static [&'static str], F)
 where
     F: Fn(&Container) -> Result<Arc<T>>,
@@ -902,6 +910,7 @@ where
 }
 
 #[cfg(feature = "debug")]
+#[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
 impl<T> Provide
     for (
         &'static [&'static str],

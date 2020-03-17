@@ -27,3 +27,6 @@ clippy:
 
 fmt:
 	$(call run_on_crates, fmt)
+
+docs:
+	RUSTDOCFLAGS='--cfg docsrs' cargo +nightly doc --all-features --open
