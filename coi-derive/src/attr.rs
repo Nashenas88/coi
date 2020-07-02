@@ -5,7 +5,7 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{
     self,
     parse::{Parse, ParseStream},
-    parse_quote, Data, DataEnum, DataUnion, DeriveInput, Error, Expr, Fields, Ident,
+    parse_quote, Data, DataEnum, DataUnion, DeriveInput, Error, Expr, Fields, Ident, ItemStruct,
     Meta::{List, NameValue, Path as MetaPath},
     NestedMeta::{Lit, Meta},
     Path, Token, Type, Visibility,
@@ -53,8 +53,141 @@ pub struct Container {
     pub injected: Vec<InjectableField>,
 }
 
+macro_rules! collect_injected_fields {
+    (@retain $field:ident, &) => {};
+    (@retain $field:ident, &mut) => {
+        $field.attrs.retain(|attr| attr.path != COI);
+    };
+    ($cx:ident, $injected:ident, $fields:expr, $is_provides:expr, $($ref_kind:tt)+) => {
+        match $($ref_kind)+ $fields {
+            Fields::Named(named_fields) => {
+                for field in $($ref_kind)+ named_fields.named {
+                    for meta_item in field
+                        .attrs
+                        .iter()
+                        .flat_map(|attr| {
+                            if !$is_provides {
+                                $cx.push(Error::new_spanned(
+                                    attr,
+                                    "coi field attribute inject only allowed when deriving Inject",
+                                ));
+                            }
+
+                            get_coi_meta_items($cx, attr)
+                        })
+                        .flatten()
+                    {
+                        match &meta_item {
+                            // Parse `#[coi(inject)]`
+                            Meta(MetaPath(word)) if word == INJECT => {
+                                let ident = field.ident.as_ref().cloned().unwrap();
+                                let ty = field.ty.clone();
+                                $injected.push(parse_quote::parse::<InjectableField>(
+                                    quote! {#ident: #ty},
+                                ));
+                            }
+                            // Parse `#[coi(inject = "...")]`
+                            Meta(NameValue(m)) if m.path == INJECT => {
+                                let ident = if let Some(ident) =
+                                    get_ident_from_lit($cx, INJECT, INJECT, &m.lit)
+                                {
+                                    ident
+                                } else {
+                                    continue;
+                                };
+                                let ty = field.ty.clone();
+                                $injected.push(parse_quote::parse::<InjectableField>(
+                                    quote! {#ident: #ty},
+                                ));
+                            }
+                            Meta(meta_item) => {
+                                let path = meta_item
+                                    .path()
+                                    .into_token_stream()
+                                    .to_string()
+                                    .replace(' ', "");
+                                $cx.push(Error::new_spanned(
+                                    meta_item.path(),
+                                    format!("unknown coi field attribute `{}`", path),
+                                ));
+                            }
+                            Lit(lit) => $cx.push(Error::new_spanned(
+                                lit,
+                                "unexpected literal in coi field attribute",
+                            )),
+                        }
+                    }
+
+                    collect_injected_fields!(@retain field, $($ref_kind)+);
+                }
+            }
+            Fields::Unnamed(unnamed_fields) => {
+                for field in $($ref_kind)+ unnamed_fields.unnamed {
+                    for meta_item in field
+                        .attrs
+                        .iter()
+                        .flat_map(|attr| get_coi_meta_items($cx, attr))
+                        .flatten()
+                    {
+                        match &meta_item {
+                                // Parse `#[coi(inject = "...")]`
+                                Meta(NameValue(m)) if m.path == INJECT => {
+                                    let ident = if let Some(ident) =
+                                        get_ident_from_lit($cx, INJECT, INJECT, &m.lit)
+                                    {
+                                        ident
+                                    } else {
+                                        continue;
+                                    };
+                                    let ty = field.ty.clone();
+                                    $injected.push(parse_quote::parse::<InjectableField>(quote!{#ident: #ty}));
+                                },
+                                // Reject `#[coi(inject)]`
+                                Meta(MetaPath(word)) if word == INJECT => {
+                                    $cx.push(Error::new_spanned(word, "unnamed fields require a named injection, `#[coi(inject = \"...\")]`"))
+                                },
+                                Meta(meta_item)  => {
+                                    let path = meta_item
+                                        .path()
+                                        .into_token_stream()
+                                        .to_string()
+                                        .replace(' ', "");
+                                    $cx.push(Error::new_spanned(
+                                        meta_item.path(),
+                                        format!("unknown coi field attribute `{}`", path),
+                                    ));
+                                },
+                                Lit(lit) => $cx.push(Error::new_spanned(lit, "unexpected literal in coi field attribute"))
+                            }
+                    }
+
+                    collect_injected_fields!(@retain field, $($ref_kind)+);
+                }
+            }
+            Fields::Unit => {}
+        };
+    }
+}
+
 impl Container {
-    pub fn from_ast(cx: &Ctxt, item: &DeriveInput, is_deriving_inject: bool) -> Option<Self> {
+    pub fn from_attr_and_item(
+        cx: &Ctxt,
+        provides: Provides,
+        item: &mut ItemStruct,
+        is_provides: bool,
+    ) -> Option<Self> {
+        let coi_path = Attr::none(cx, CRATE);
+        let mut injected = vec![];
+        collect_injected_fields!(cx, injected, item.fields, is_provides, &mut);
+
+        Some(Container {
+            coi_path: coi_path.get(),
+            providers: vec![provides],
+            injected,
+        })
+    }
+
+    pub fn from_ast(cx: &Ctxt, item: &DeriveInput, is_provides: bool) -> Option<Self> {
         let mut coi_path = Attr::none(cx, CRATE);
         let mut providers = vec![];
 
@@ -75,7 +208,7 @@ impl Container {
             match coi_attr {
                 ContainerAttr::Provides(p) => {
                     if has_multiple_unnamed_providers && p.name.is_none() {
-                        cx.push(Error::new_spanned(attr, "expected `#[coi(provides <type> as <unique name> with <expr>)]` when multiple provides field attributes are supplied"))
+                        cx.push(Error::new_spanned(attr, "expected `#[coi::coi(provides <type> as <unique name> with <expr>)]` when multiple provides field attributes are supplied"))
                     }
 
                     providers.push(p);
@@ -97,109 +230,7 @@ impl Container {
         };
 
         let mut injected = vec![];
-        match &data_struct.fields {
-            Fields::Named(named_fields) => {
-                for field in &named_fields.named {
-                    for meta_item in field
-                        .attrs
-                        .iter()
-                        .flat_map(|attr| {
-                            if !is_deriving_inject {
-                                cx.push(Error::new_spanned(
-                                    attr,
-                                    "coi field attribute inject only allowed when deriving Inject",
-                                ));
-                            }
-
-                            get_coi_meta_items(cx, attr)
-                        })
-                        .flatten()
-                    {
-                        match &meta_item {
-                            // Parse `#[coi(inject)]`
-                            Meta(MetaPath(word)) if word == INJECT => {
-                                let ident = field.ident.as_ref().cloned().unwrap();
-                                let ty = field.ty.clone();
-                                injected.push(parse_quote::parse::<InjectableField>(
-                                    quote! {#ident: #ty},
-                                ));
-                            }
-                            // Parse `#[coi(inject = "...")]`
-                            Meta(NameValue(m)) if m.path == INJECT => {
-                                let ident = if let Some(ident) =
-                                    get_ident_from_lit(cx, INJECT, INJECT, &m.lit)
-                                {
-                                    ident
-                                } else {
-                                    continue;
-                                };
-                                let ty = field.ty.clone();
-                                injected.push(parse_quote::parse::<InjectableField>(
-                                    quote! {#ident: #ty},
-                                ));
-                            }
-                            Meta(meta_item) => {
-                                let path = meta_item
-                                    .path()
-                                    .into_token_stream()
-                                    .to_string()
-                                    .replace(' ', "");
-                                cx.push(Error::new_spanned(
-                                    meta_item.path(),
-                                    format!("unknown coi field attribute `{}`", path),
-                                ));
-                            }
-                            Lit(lit) => cx.push(Error::new_spanned(
-                                lit,
-                                "unexpected literal in coi field attribute",
-                            )),
-                        }
-                    }
-                }
-            }
-            Fields::Unnamed(unnamed_fields) => {
-                for field in &unnamed_fields.unnamed {
-                    for meta_item in field
-                        .attrs
-                        .iter()
-                        .flat_map(|attr| get_coi_meta_items(cx, attr))
-                        .flatten()
-                    {
-                        match &meta_item {
-                                // Parse `#[coi(inject = "...")]`
-                                Meta(NameValue(m)) if m.path == INJECT => {
-                                    let ident = if let Some(ident) =
-                                        get_ident_from_lit(cx, INJECT, INJECT, &m.lit)
-                                    {
-                                        ident
-                                    } else {
-                                        continue;
-                                    };
-                                    let ty = field.ty.clone();
-                                    injected.push(parse_quote::parse::<InjectableField>(quote!{#ident: #ty}));
-                                },
-                                // Reject `#[coi(inject)]`
-                                Meta(MetaPath(word)) if word == INJECT => {
-                                    cx.push(Error::new_spanned(word, "unnamed fields require a named injection, `#[coi(inject = \"...\")]`"))
-                                },
-                                Meta(meta_item)  => {
-                                    let path = meta_item
-                                        .path()
-                                        .into_token_stream()
-                                        .to_string()
-                                        .replace(' ', "");
-                                    cx.push(Error::new_spanned(
-                                        meta_item.path(),
-                                        format!("unknown coi field attribute `{}`", path),
-                                    ));
-                                },
-                                Lit(lit) => cx.push(Error::new_spanned(lit, "unexpected literal in coi field attribute"))
-                            }
-                    }
-                }
-            }
-            Fields::Unit => {}
-        };
+        collect_injected_fields!(cx, injected, data_struct.fields, is_provides, &);
 
         Some(Container {
             coi_path: coi_path.get(),
@@ -326,7 +357,7 @@ impl Provides {
 impl Parse for Provides {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         input.parse().and_then(|ident: Ident| {
-            if ident.eq("provides") {
+            if ident == PROVIDES {
                 Ok(())
             } else {
                 Err(Error::new(ident.span(), "expected `provides`"))

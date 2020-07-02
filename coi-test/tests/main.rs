@@ -1,12 +1,11 @@
-use coi::{container, Inject};
+use coi::{coi, container};
 use std::sync::Arc;
 
-pub trait Trait1: Inject {
+pub trait Trait1 {
     fn describe(&self) -> &'static str;
 }
 
-#[derive(Inject)]
-#[coi(provides dyn Trait1 with Impl1)]
+#[coi(provides dyn Trait1 + Send + Sync with Impl1)]
 struct Impl1;
 
 impl Trait1 for Impl1 {
@@ -15,19 +14,18 @@ impl Trait1 for Impl1 {
     }
 }
 
-pub trait Trait2: Inject {
+pub trait Trait2 {
     fn deep_describe(&self) -> String;
 }
 
-#[derive(Inject)]
-#[coi(provides dyn Trait2 with Impl2::new(trait1))]
+#[coi(provides dyn Trait2 + Send + Sync with Impl2::new(trait1))]
 struct Impl2 {
     #[coi(inject)]
-    trait1: Arc<dyn Trait1>,
+    trait1: Arc<dyn Trait1 + Send + Sync>,
 }
 
 impl Impl2 {
-    fn new(trait1: Arc<dyn Trait1>) -> Self {
+    fn new(trait1: Arc<dyn Trait1 + Send + Sync>) -> Self {
         Self { trait1 }
     }
 }
@@ -38,23 +36,23 @@ impl Trait2 for Impl2 {
     }
 }
 
-#[derive(Debug, Inject)]
 #[coi(provides JustAStruct with JustAStruct)]
+#[derive(Debug)]
 pub struct JustAStruct;
 
 #[test]
-fn main() {
+fn main_test() {
     let container = container! {
         trait1 => Impl1Provider,
         trait2 => Impl2Provider,
-        struct => JustAStructProvider
+        a_struct => JustAStructProvider
     };
     let trait2 = container
-        .resolve::<dyn Trait2>("trait2")
+        .resolve::<dyn Trait2 + Send + Sync>("trait2")
         .expect("Should exist");
     println!("Deep description: {}", trait2.as_ref().deep_describe());
     let a_struct = container
-        .resolve::<JustAStruct>("struct")
+        .resolve::<JustAStruct>("a_struct")
         .expect("Should exist");
     println!("Got struct! {:?}", a_struct);
 }
@@ -65,11 +63,12 @@ fn can_send_through_threads() {
         trait1 => Impl1Provider,
     };
     let _trait1 = container
-        .resolve::<dyn Trait1>("trait1")
+        .resolve::<dyn Trait1 + Send + Sync>("trait1")
         .expect("Should exist");
+    let container = Arc::new(container);
     let thread_container = container.clone();
     let thread = std::thread::spawn(move || {
-        let _trait1 = thread_container.resolve::<dyn Trait1>("trait1");
+        let _trait1 = thread_container.resolve::<dyn Trait1 + Send + Sync>("trait1");
     });
     thread.join().expect("Couldn't join thread");
 }

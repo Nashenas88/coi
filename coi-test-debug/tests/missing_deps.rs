@@ -1,36 +1,34 @@
-use coi::{container, AnalysisError, Inject};
+use coi::{coi, container, AnalysisError};
 use std::sync::Arc;
 
-trait Trait1: Inject {}
-trait Trait2: Inject {}
-trait Trait3: Inject {}
+trait Trait1 {}
+trait Trait2 {}
+trait Trait3 {}
 
 #[allow(dead_code)]
-#[derive(Inject)]
-#[coi(provides dyn Trait1 with Impl1::new(t3))]
+#[coi(provides dyn Trait1 + Send + Sync with Impl1::new(t3))]
 struct Impl1 {
     #[coi(inject)]
-    t3: Arc<dyn Trait3>,
+    t3: Arc<dyn Trait3 + Send + Sync>,
 }
 
 impl Trait1 for Impl1 {}
 impl Impl1 {
-    fn new(t3: Arc<dyn Trait3>) -> Self {
+    fn new(t3: Arc<dyn Trait3 + Send + Sync>) -> Self {
         Self { t3 }
     }
 }
 
 #[allow(dead_code)]
-#[derive(Inject)]
-#[coi(provides dyn Trait2 with Impl2::new(t3))]
+#[coi(provides dyn Trait2 + Send + Sync with Impl2::new(t3))]
 struct Impl2 {
     #[coi(inject)]
-    t3: Arc<dyn Trait3>,
+    t3: Arc<dyn Trait3 + Send + Sync>,
 }
 
 impl Trait2 for Impl2 {}
 impl Impl2 {
-    fn new(t3: Arc<dyn Trait3>) -> Self {
+    fn new(t3: Arc<dyn Trait3 + Send + Sync>) -> Self {
         Self { t3 }
     }
 }
