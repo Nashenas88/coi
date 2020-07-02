@@ -1,21 +1,19 @@
-use coi::{container, Container, Inject, Provide, Result};
+use coi::{container, Container, Provide, Result};
 use std::sync::Arc;
 
-pub trait Trait1: Inject {
+pub trait Trait1 {
     fn describe(&self) -> &'static str;
 }
 
 struct Impl1;
 
-impl Inject for Impl1 {}
-
 struct Impl1Provider;
 
 impl Provide for Impl1Provider {
-    type Output = dyn Trait1;
+    type Output = dyn Trait1 + Send + Sync;
 
     fn provide(&self, _: &Container) -> Result<Arc<Self::Output>> {
-        Ok(Arc::new(Impl1) as Arc<dyn Trait1>)
+        Ok(Arc::new(Impl1) as Arc<dyn Trait1 + Send + Sync>)
     }
 }
 
@@ -25,29 +23,27 @@ impl Trait1 for Impl1 {
     }
 }
 
-pub trait Trait2: Inject {
+pub trait Trait2 {
     fn deep_describe(&self) -> String;
 }
 
 struct Impl2 {
-    trait1: Arc<dyn Trait1>,
+    trait1: Arc<dyn Trait1 + Send + Sync>,
 }
-
-impl Inject for Impl2 {}
 
 struct Impl2Provider;
 
 impl Provide for Impl2Provider {
-    type Output = dyn Trait2;
+    type Output = dyn Trait2 + Send + Sync;
 
     fn provide(&self, container: &Container) -> Result<Arc<Self::Output>> {
-        let trait1 = container.resolve::<dyn Trait1>("trait1")?;
-        Ok(Arc::new(Impl2::new(trait1)) as Arc<dyn Trait2>)
+        let trait1 = container.resolve::<dyn Trait1 + Send + Sync>("trait1")?;
+        Ok(Arc::new(Impl2::new(trait1)) as Arc<dyn Trait2 + Send + Sync>)
     }
 }
 
 impl Impl2 {
-    fn new(trait1: Arc<dyn Trait1>) -> Self {
+    fn new(trait1: Arc<dyn Trait1 + Send + Sync>) -> Self {
         Self { trait1 }
     }
 }
@@ -59,8 +55,6 @@ impl Trait2 for Impl2 {
 }
 
 pub struct JustAStruct;
-
-impl Inject for JustAStruct {}
 
 struct JustAStructProvider;
 
@@ -79,7 +73,7 @@ fn main() {
         trait2 => Impl2Provider
     };
     let trait2 = container
-        .resolve::<dyn Trait2>("trait2")
+        .resolve::<dyn Trait2 + Send + Sync>("trait2")
         .expect("Should exist");
     println!("Deep description: {}", trait2.as_ref().deep_describe());
 }

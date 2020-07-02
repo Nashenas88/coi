@@ -2,7 +2,7 @@
 #![feature(test)]
 extern crate test;
 
-use coi::{container, Inject};
+use coi::{coi, container};
 use std::sync::Arc;
 use test::Bencher;
 
@@ -222,9 +222,8 @@ macro_rules! make_wide_container {
 
 #[bench]
 fn a_simple_resolve(b: &mut Bencher) {
-    trait I: Inject {}
-    #[derive(Inject)]
-    #[coi(provides dyn I with S)]
+    trait I {}
+    #[coi(provides dyn I + Send + Sync with S)]
     struct S;
 
     impl I for S {}
@@ -232,85 +231,85 @@ fn a_simple_resolve(b: &mut Bencher) {
     let container = container! {
         s => SProvider,
     };
-    b.iter(|| container.resolve::<dyn I>("s").unwrap());
+    b.iter(|| container.resolve::<dyn I + Send + Sync>("s").unwrap());
 }
 
 #[bench]
 fn deeply_nested_transient_dependencies(b: &mut Bencher) {
     let container = make_deep_container!();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
 fn deeply_nested_singleton_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(singleton);
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
 fn deeply_nested_scoped_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(scoped);
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
 fn wide_transient_dependencies(b: &mut Bencher) {
     let container = make_wide_container!();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
 fn wide_singleton_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(singleton);
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
 fn wide_scoped_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(scoped);
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
 fn scoped_container_deeply_nested_transient_dependencies(b: &mut Bencher) {
     let container = make_deep_container!();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
 fn scoped_container_deeply_nested_singleton_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(singleton);
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
 fn scoped_container_deeply_nested_scoped_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(scoped);
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
 fn scoped_container_wide_transient_dependencies(b: &mut Bencher) {
     let container = make_wide_container!();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
 fn scoped_container_wide_singleton_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(singleton);
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
 fn scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(scoped);
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
@@ -318,7 +317,7 @@ fn doubly_scoped_container_deeply_nested_transient_dependencies(b: &mut Bencher)
     let container = make_deep_container!();
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
@@ -326,7 +325,7 @@ fn doubly_scoped_container_deeply_nested_singleton_dependencies(b: &mut Bencher)
     let container = make_deep_container!(singleton);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
@@ -334,7 +333,7 @@ fn doubly_scoped_container_deeply_nested_scoped_dependencies(b: &mut Bencher) {
     let container = make_deep_container!(scoped);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    b.iter(|| container.resolve::<dyn ID1 + Send + Sync>("d1").unwrap());
 }
 
 #[bench]
@@ -342,7 +341,7 @@ fn doubly_scoped_container_wide_transient_dependencies(b: &mut Bencher) {
     let container = make_wide_container!();
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
@@ -350,7 +349,7 @@ fn doubly_scoped_container_wide_singleton_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(singleton);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 #[bench]
@@ -358,29 +357,31 @@ fn doubly_scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
     let container = make_wide_container!(scoped);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    b.iter(|| container.resolve::<dyn IW1 + Send + Sync>("w1").unwrap());
 }
 
 macro_rules! make_dep {
-    ($trait:ident, $struct:ident, [$($dep_name:ident => $dep_trait:ident),*]) => {
-        trait $trait: Inject {}
+    (@expr $e:expr) => {
+        $e
+    };
+    ($trayt:ident, $strukt:ident, [$($dep_name:ident => $dep_trait:ident),*]) => {
+        trait $trayt {}
         #[allow(dead_code)]
-        #[derive(Inject)]
-        #[coi(provides dyn $trait with $struct::new($($dep_name),*))]
-        struct $struct {
+        #[coi(provides dyn $trayt + Send + Sync with make_dep!(@expr $strukt::new($($dep_name),*)))]
+        struct $strukt {
             $(
                 #[coi(inject)]
-                $dep_name: Arc<dyn $dep_trait>,
+                $dep_name: Arc<dyn $dep_trait + Send + Sync>,
             )*
         }
 
-        impl $struct {
-            fn new($($dep_name: Arc<dyn $dep_trait>),*) -> Self {
+        impl $strukt {
+            fn new($($dep_name: Arc<dyn $dep_trait + Send + Sync>),*) -> Self {
                 Self { $($dep_name,)* }
             }
         }
 
-        impl $trait for $struct {}
+        impl $trayt for $strukt {}
     }
 }
 make_dep!(ID1, D1, [d2 => ID2]);

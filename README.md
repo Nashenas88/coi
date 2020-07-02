@@ -13,17 +13,14 @@ on as the crate matures.
 ### Example 
 
 ```rust
-use coi::{container, Inject};
+use coi::{coi, container};
 use std::sync::Arc;
 
-// Inherit `Inject` on all traits you'd like to inject
-pub trait Trait1: Inject {
+pub trait Trait1 {
     fn describe(&self) -> &'static str;
 }
 
-// derive `Inject` on all structs that will provide the implementation
-#[derive(Inject)]
-#[coi(provides dyn Trait1 with Impl1)]
+#[coi(provides dyn Trait1 + Send + Sync with Impl1)]
 struct Impl1;
 
 // actually impl the trait
@@ -33,20 +30,19 @@ impl Trait1 for Impl1 {
     }
 }
 
-pub trait Trait2: Inject {
+pub trait Trait2 {
     fn deep_describe(&self) -> String;
 }
 
-#[derive(Inject)]
-#[coi(provides dyn Trait2 with Impl2::new(trait1))]
+#[coi(provides dyn Trait2 + Send + Sync with Impl2::new(trait1))]
 struct Impl2 {
     // inject dependencies by Arc<dyn SomeTrait>
     #[coi(inject)]
-    trait1: Arc<dyn Trait1>,
+    trait1: Arc<dyn Trait1 + Send + Sync>,
 }
 
 impl Impl2 {
-    fn new(trait1: Arc<dyn Trait1>) -> Self {
+    fn new(trait1: Arc<dyn Trait1 + Send + Sync>) -> Self {
         Self { trait1 }
     }
 }
@@ -58,8 +54,8 @@ impl Trait2 for Impl2 {
 }
 
 // It even works on structs
-#[derive(Debug, Inject)]
 #[coi(provides JustAStruct with JustAStruct)]
+#[derive(Debug)]
 pub struct JustAStruct;
 
 fn main() {
@@ -67,16 +63,16 @@ fn main() {
     let container = container!{
         trait1 => Impl1Provider,
         trait2 => Impl2Provider; scoped,
-        struct => JustAStructProvider; singleton
+        a_struct => JustAStructProvider; singleton
     };
 
     // And resolve away!
     let trait2 = container
-        .resolve::<dyn Trait2>("trait2")
+        .resolve::<dyn Trait2 + Send + Sync>("trait2")
         .expect("Should exist");
     println!("Deep description: {}", trait2.as_ref().deep_describe());
     let a_struct = container
-        .resolve::<JustAStruct>("struct")
+        .resolve::<JustAStruct>("a_struct")
         .expect("Should exist");
     println!("Got struct! {:?}", a_struct);
 }
