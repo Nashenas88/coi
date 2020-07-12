@@ -176,7 +176,7 @@ impl PaymentService for PaymentSvc {}
 struct Guid;
 
 #[bench]
-fn a_simple_resolve(b: &mut Bencher) {
+fn run_15_background_threads_while_resolving(b: &mut Bencher) {
     use std::sync::atomic::AtomicBool;
 
     let container = Arc::new(container! {
