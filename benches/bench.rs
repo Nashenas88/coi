@@ -6,7 +6,7 @@ mod threads;
 mod wide;
 
 criterion_group!(simple, simple::a_simple_resolve);
-criterion_group!(threads, threads::a_simple_resolve);
+criterion_group!(threads, threads::run_15_background_threads_while_resolving);
 
 criterion_group!(
     deeply_nested,

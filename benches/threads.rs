@@ -178,7 +178,7 @@ impl PaymentService for PaymentSvc {}
 #[coi(provides Guid with Guid)]
 struct Guid;
 
-pub fn a_simple_resolve(c: &mut Criterion) {
+pub fn run_15_background_threads_while_resolving(c: &mut Criterion) {
     let container = Arc::new(container! {
         guid => GuidProvider,
         mysql_db => MySqlProvider; scoped,
@@ -244,7 +244,7 @@ pub fn a_simple_resolve(c: &mut Criterion) {
         handles.push(handle);
     }
 
-    c.bench_function("a simple threaded resolver", |b| {
+    c.bench_function("run 15 background threads while resolving", |b| {
         b.iter(|| {
             let container = container.scoped();
             container.resolve::<Guid>("guid").unwrap();
