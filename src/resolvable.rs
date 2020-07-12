@@ -1,18 +1,16 @@
 use crate::container::Container;
 use crate::registration::RegistrationKind;
 use crate::{ContainerKey, Error, Result};
+use parking_lot::{RwLock, RwLockWriteGuard};
 use std::any::Any;
-use std::cell::UnsafeCell;
 #[cfg(feature = "debug")]
 use std::fmt::{self, Debug};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
-use parking_lot::{RwLock, RwLockWriteGuard};
 
 pub(crate) struct Resolvable {
-    variant: AtomicU8,
-    building_lock: RwLock<()>,
-    item: UnsafeCell<Option<Box<dyn Any + Send + Sync>>>,
+    state: AtomicU8,
+    item: Arc<RwLock<Option<Box<dyn Any + Send + Sync>>>>,
 }
 
 #[cfg(feature = "debug")]
@@ -21,16 +19,10 @@ impl Debug for Resolvable {
         write!(
             f,
             "{}",
-            match self.variant.load(Ordering::Relaxed) {
-                UNRESOLVED => {
-                    "unresolved"
-                }
-                BUILDING => {
-                    "building"
-                }
-                RESOLVED => {
-                    "resolved"
-                }
+            match self.state.load(Ordering::Relaxed) {
+                UNRESOLVED => "unresolved",
+                BUILDING => "building",
+                RESOLVED => "resolved",
                 _ => unreachable!(),
             }
         )
@@ -39,14 +31,13 @@ impl Debug for Resolvable {
 
 const UNRESOLVED: u8 = 0;
 const BUILDING: u8 = 1;
-const RESOLVED: u8 = 3;
+const RESOLVED: u8 = 2;
 
 impl Resolvable {
     pub(crate) fn new() -> Self {
         Self {
-            variant: AtomicU8::new(UNRESOLVED),
-            building_lock: RwLock::new(()),
-            item: UnsafeCell::new(None),
+            state: AtomicU8::new(UNRESOLVED),
+            item: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -59,36 +50,33 @@ impl Resolvable {
     where
         T: Send + Sync + ?Sized + 'static,
     {
-        let state = self.variant.load(Ordering::Acquire);
+        let state = self.state.load(Ordering::Acquire);
         if state == UNRESOLVED {
-            let write = self.building_lock.write();
+            let item = self.item.write();
             if self
-                .variant
-                .compare_and_swap(UNRESOLVED, BUILDING, Ordering::AcqRel)
+                .state
+                .compare_and_swap(UNRESOLVED, BUILDING, Ordering::Relaxed)
                 == UNRESOLVED
             {
-                // we now own resolution
-                return self.resolve_inner(key, kind, container, write);
+                return self.resolve_inner(key, kind, container, item);
             }
         }
 
         loop {
-            match self.variant.load(Ordering::Relaxed) {
-                // Another thread had an error resolving, try to take over
+            match self.state.load(Ordering::Acquire) {
                 UNRESOLVED => {
-                    let write = self.building_lock.write();
+                    let item = self.item.write();
                     if self
-                        .variant
-                        .compare_and_swap(UNRESOLVED, BUILDING, Ordering::AcqRel)
+                        .state
+                        .compare_and_swap(UNRESOLVED, BUILDING, Ordering::Relaxed)
                         == UNRESOLVED
                     {
-                        // we now own resolution
-                        return self.resolve_inner(key, kind, container, write);
+                        return self.resolve_inner(key, kind, container, item);
                     }
                 }
                 BUILDING => {
-                    // block this thread while building is in progress
-                    let _read = self.building_lock.read();
+                    // blocks this thread while building
+                    let _item = self.item.read();
                 }
                 RESOLVED => {
                     break;
@@ -97,10 +85,11 @@ impl Resolvable {
             }
         }
 
-        let any = Option::as_ref(unsafe { &*self.item.get() }).unwrap();
+        let item = self.item.read();
+        let any = Option::as_ref(&*item).unwrap();
         match any.downcast_ref::<Arc<T>>() {
             Some(val) => Ok(val.clone()),
-            None => Err(Error::KeyNotFound(key)),
+            None => Err(Error::TypeMismatch(key)),
         }
     }
 
@@ -110,9 +99,7 @@ impl Resolvable {
         key: ContainerKey,
         kind: RegistrationKind,
         container: &Container,
-        // This lock keeps other threads interested in this key blocked while
-        // building is in progress
-        _write_lock: RwLockWriteGuard<()>,
+        mut item: RwLockWriteGuard<Option<Box<dyn Any + Send + Sync>>>,
     ) -> Result<Arc<T>>
     where
         T: Send + Sync + ?Sized + 'static,
@@ -121,23 +108,20 @@ impl Resolvable {
             Ok(resolved) => resolved,
             err @ Err(_) => {
                 let val = self
-                    .variant
+                    .state
                     .compare_and_swap(BUILDING, UNRESOLVED, Ordering::SeqCst);
                 assert_eq!(val, BUILDING);
                 return err;
             }
         };
 
-        unsafe {
-            *self.item.get() = Some(Box::new(resolved.clone()) as Box<dyn Any + Send + Sync>)
-        };
-
+        *item = Some(Box::new(resolved.clone()) as Box<dyn Any + Send + Sync>);
         let val = self
-            .variant
+            .state
             .compare_and_swap(BUILDING, RESOLVED, Ordering::SeqCst);
         assert_eq!(val, BUILDING);
         Ok(resolved)
     }
 }
 
-unsafe impl Sync for Resolvable {}
+// unsafe impl Sync for Resolvable {}
