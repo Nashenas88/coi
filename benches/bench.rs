@@ -227,7 +227,9 @@ fn a_simple_resolve(c: &mut Criterion) {
     let container = container! {
         s => SProvider,
     };
-    c.bench_function("simple resolver", |b| b.iter(|| container.resolve::<dyn I>("s").unwrap()));
+    c.bench_function("simple resolver", |b| {
+        b.iter(|| container.resolve::<dyn I>("s").unwrap())
+    });
 }
 
 fn deeply_nested_transient_dependencies(c: &mut Criterion) {
