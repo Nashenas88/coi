@@ -39,7 +39,7 @@ impl Debug for Resolvable {
 
 const UNRESOLVED: u8 = 0;
 const BUILDING: u8 = 1;
-const RESOLVED: u8 = 3;
+const RESOLVED: u8 = 2;
 
 impl Resolvable {
     pub(crate) fn new() -> Self {
