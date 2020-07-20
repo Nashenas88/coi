@@ -1,10 +1,6 @@
-#![allow(soft_unstable)]
-#![feature(test)]
-extern crate test;
-
 use coi::{container, Inject};
+use criterion::{criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
-use test::Bencher;
 
 macro_rules! make_deep_container {
     ($($scope_type:ident)?) => {
@@ -220,8 +216,7 @@ macro_rules! make_wide_container {
     }
 }
 
-#[bench]
-fn a_simple_resolve(b: &mut Bencher) {
+fn a_simple_resolve(c: &mut Criterion) {
     trait I: Inject {}
     #[derive(Inject)]
     #[coi(provides dyn I with S)]
@@ -232,134 +227,201 @@ fn a_simple_resolve(b: &mut Bencher) {
     let container = container! {
         s => SProvider,
     };
-    b.iter(|| container.resolve::<dyn I>("s").unwrap());
+    c.bench_function("simple resolver", |b| {
+        b.iter(|| container.resolve::<dyn I>("s").unwrap())
+    });
 }
 
-#[bench]
-fn deeply_nested_transient_dependencies(b: &mut Bencher) {
+fn deeply_nested_transient_dependencies(c: &mut Criterion) {
     let container = make_deep_container!();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    c.bench_function("deeply nested transient", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
 }
 
-#[bench]
-fn deeply_nested_singleton_dependencies(b: &mut Bencher) {
+fn deeply_nested_singleton_dependencies(c: &mut Criterion) {
     let container = make_deep_container!(singleton);
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    c.bench_function("deeply nested singleton", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
 }
 
-#[bench]
-fn deeply_nested_scoped_dependencies(b: &mut Bencher) {
+fn deeply_nested_scoped_dependencies(c: &mut Criterion) {
     let container = make_deep_container!(scoped);
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    c.bench_function("deeply nested scoped", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
 }
 
-#[bench]
-fn wide_transient_dependencies(b: &mut Bencher) {
+fn wide_transient_dependencies(c: &mut Criterion) {
     let container = make_wide_container!();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    c.bench_function("wide transient", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
 }
 
-#[bench]
-fn wide_singleton_dependencies(b: &mut Bencher) {
+fn wide_singleton_dependencies(c: &mut Criterion) {
     let container = make_wide_container!(singleton);
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    c.bench_function("wide singleton", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
 }
 
-#[bench]
-fn wide_scoped_dependencies(b: &mut Bencher) {
+fn wide_scoped_dependencies(c: &mut Criterion) {
     let container = make_wide_container!(scoped);
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    c.bench_function("wide scoped", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
 }
 
-#[bench]
-fn scoped_container_deeply_nested_transient_dependencies(b: &mut Bencher) {
-    let container = make_deep_container!();
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
-}
-
-#[bench]
-fn scoped_container_deeply_nested_singleton_dependencies(b: &mut Bencher) {
-    let container = make_deep_container!(singleton);
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
-}
-
-#[bench]
-fn scoped_container_deeply_nested_scoped_dependencies(b: &mut Bencher) {
-    let container = make_deep_container!(scoped);
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
-}
-
-#[bench]
-fn scoped_container_wide_transient_dependencies(b: &mut Bencher) {
-    let container = make_wide_container!();
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
-}
-
-#[bench]
-fn scoped_container_wide_singleton_dependencies(b: &mut Bencher) {
-    let container = make_wide_container!(singleton);
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
-}
-
-#[bench]
-fn scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
-    let container = make_wide_container!(scoped);
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
-}
-
-#[bench]
-fn doubly_scoped_container_deeply_nested_transient_dependencies(b: &mut Bencher) {
+fn scoped_container_deeply_nested_transient_dependencies(c: &mut Criterion) {
     let container = make_deep_container!();
     let container = container.scoped();
-    let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    c.bench_function("scoped deeply nested transient", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
 }
 
-#[bench]
-fn doubly_scoped_container_deeply_nested_singleton_dependencies(b: &mut Bencher) {
+fn scoped_container_deeply_nested_singleton_dependencies(c: &mut Criterion) {
+    let container = make_deep_container!(singleton);
+    let container = container.scoped();
+    c.bench_function("scoped deeply nested singleton", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
+}
+
+fn scoped_container_deeply_nested_scoped_dependencies(c: &mut Criterion) {
+    let container = make_deep_container!(scoped);
+    let container = container.scoped();
+    c.bench_function("scoped deeply nested scoped", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
+}
+
+fn scoped_container_wide_transient_dependencies(c: &mut Criterion) {
+    let container = make_wide_container!();
+    let container = container.scoped();
+    c.bench_function("scoped wide transient", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
+}
+
+fn scoped_container_wide_singleton_dependencies(c: &mut Criterion) {
+    let container = make_wide_container!(singleton);
+    let container = container.scoped();
+    c.bench_function("scoped wide singleton", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
+}
+
+fn scoped_container_wide_scoped_dependencies(c: &mut Criterion) {
+    let container = make_wide_container!(scoped);
+    let container = container.scoped();
+    c.bench_function("scoped wide scoped", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
+}
+
+fn doubly_scoped_container_deeply_nested_transient_dependencies(c: &mut Criterion) {
+    let container = make_deep_container!();
+    let container = container.scoped();
+    let container = container.scoped();
+    c.bench_function("double scoped deeply nested transient", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
+}
+
+fn doubly_scoped_container_deeply_nested_singleton_dependencies(c: &mut Criterion) {
     let container = make_deep_container!(singleton);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    c.bench_function("double scoped deeply nested singleton", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
 }
 
-#[bench]
-fn doubly_scoped_container_deeply_nested_scoped_dependencies(b: &mut Bencher) {
+fn doubly_scoped_container_deeply_nested_scoped_dependencies(c: &mut Criterion) {
     let container = make_deep_container!(scoped);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn ID1>("d1").unwrap());
+    c.bench_function("double scoped deeply nested scoped", |b| {
+        b.iter(|| container.resolve::<dyn ID1>("d1").unwrap())
+    });
 }
 
-#[bench]
-fn doubly_scoped_container_wide_transient_dependencies(b: &mut Bencher) {
+fn doubly_scoped_container_wide_transient_dependencies(c: &mut Criterion) {
     let container = make_wide_container!();
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    c.bench_function("double scoped wide transient", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
 }
 
-#[bench]
-fn doubly_scoped_container_wide_singleton_dependencies(b: &mut Bencher) {
+fn doubly_scoped_container_wide_singleton_dependencies(c: &mut Criterion) {
     let container = make_wide_container!(singleton);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    c.bench_function("double scoped wide singleton", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
 }
 
-#[bench]
-fn doubly_scoped_container_wide_scoped_dependencies(b: &mut Bencher) {
+fn doubly_scoped_container_wide_scoped_dependencies(c: &mut Criterion) {
     let container = make_wide_container!(scoped);
     let container = container.scoped();
     let container = container.scoped();
-    b.iter(|| container.resolve::<dyn IW1>("w1").unwrap());
+    c.bench_function("double scoped wide scoped", |b| {
+        b.iter(|| container.resolve::<dyn IW1>("w1").unwrap())
+    });
 }
+
+criterion_group!(simple, a_simple_resolve);
+criterion_group!(
+    deeply_nested,
+    deeply_nested_transient_dependencies,
+    deeply_nested_singleton_dependencies,
+    deeply_nested_scoped_dependencies
+);
+criterion_group!(
+    wide,
+    wide_transient_dependencies,
+    wide_singleton_dependencies,
+    wide_scoped_dependencies
+);
+criterion_group!(
+    scoped_deeply_nested,
+    scoped_container_deeply_nested_transient_dependencies,
+    scoped_container_deeply_nested_singleton_dependencies,
+    scoped_container_deeply_nested_scoped_dependencies
+);
+criterion_group!(
+    scoped_wide,
+    scoped_container_wide_transient_dependencies,
+    scoped_container_wide_singleton_dependencies,
+    scoped_container_wide_scoped_dependencies
+);
+criterion_group!(
+    double_scoped_deeply_nested,
+    doubly_scoped_container_deeply_nested_transient_dependencies,
+    doubly_scoped_container_deeply_nested_singleton_dependencies,
+    doubly_scoped_container_deeply_nested_scoped_dependencies
+);
+criterion_group!(
+    double_scoped_wide,
+    doubly_scoped_container_wide_transient_dependencies,
+    doubly_scoped_container_wide_singleton_dependencies,
+    doubly_scoped_container_wide_scoped_dependencies
+);
+criterion_main!(
+    simple,
+    deeply_nested,
+    wide,
+    scoped_deeply_nested,
+    scoped_wide,
+    double_scoped_deeply_nested,
+    double_scoped_wide
+);
 
 macro_rules! make_dep {
     ($trait:ident, $struct:ident, [$($dep_name:ident => $dep_trait:ident),*]) => {
