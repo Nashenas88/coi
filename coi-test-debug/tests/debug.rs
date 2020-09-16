@@ -1,4 +1,4 @@
-use coi::{container, Inject};
+use coi::{container, Inject, Provide};
 use std::sync::Arc;
 
 trait Trait1: Inject {}
@@ -59,14 +59,27 @@ impl Impl5 {
 
 impl Trait5 for Impl5 {}
 
+#[derive(Inject)]
+pub struct StructA<T>(T)
+where
+    T: Clone;
+
+#[derive(Provide)]
+#[coi(provides StructA<T> with StructA(self.0.clone()))]
+pub struct StructAProvider<T>(T)
+where
+    T: Clone;
+
 #[test]
 fn main() {
+    let struct_a_provider = StructAProvider(String::from("a"));
     let container = container! {
         trait1 => Impl1Provider,
         trait2 => Impl2Provider; scoped,
         trait3 => Impl3Provider,
         trait4 => Impl4Provider; singleton,
         trait5 => Impl5Provider,
+        structa => struct_a_provider; singleton,
     };
     let debugged = format!("{:?}", container);
     assert!(debugged.contains(r#""trait1": []"#));
@@ -74,4 +87,5 @@ fn main() {
     assert!(debugged.contains(r#""trait3": []"#));
     assert!(debugged.contains(r#""trait4": []"#));
     assert!(debugged.contains(r#""trait5": ["trait1", "trait2", "trait3", "trait4"]"#));
+    assert!(debugged.contains(r#""structa": []"#));
 }
