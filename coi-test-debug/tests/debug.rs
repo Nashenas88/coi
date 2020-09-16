@@ -60,12 +60,15 @@ impl Impl5 {
 impl Trait5 for Impl5 {}
 
 #[derive(Inject)]
-pub struct StructA<T>(T) where T: Clone;
+pub struct StructA<T>(T)
+where
+    T: Clone;
 
 #[derive(Provide)]
 #[coi(provides StructA<T> with StructA(self.0.clone()))]
-pub struct StructAProvider<T>(T) where T: Clone;
-
+pub struct StructAProvider<T>(T)
+where
+    T: Clone;
 
 #[test]
 fn main() {
