@@ -1,6 +1,6 @@
 [package]
 name = "coi"
-version = "0.9.2"
+version = "0.10.0"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ description = "coi is a Dependency Injection library."
 readme = "README.md"
 
 [dependencies]
-coi-derive = { path = "coi-derive", version = "0.9.0", optional = true, default-features = false }
+coi-derive = { path = "coi-derive", version = "0.10.0", optional = true, default-features = false }
 rustc-hash = "1.1"
 petgraph = { version = "0.5.0", optional = true }
 thiserror = "1.0"
