@@ -394,8 +394,8 @@ pub fn provide_derive(input: TokenStream) -> TokenStream {
             quote! {
                 fn dependencies(
                     &self
-                ) -> Vec<&'static str> {
-                    vec![]
+                ) -> &'static [&'static str] {
+                    &[]
                 }
             }
         }]
