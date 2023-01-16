@@ -683,8 +683,8 @@ impl Container {
         let mut graph = DiGraph::<AnalysisNode, AnalysisNode>::new();
         let mut key_to_node = container
             .dependency_map
-            .iter()
-            .map(|(k, _)| -> (&'static str, NodeIndex) {
+            .keys()
+            .map(|k| -> (&'static str, NodeIndex) {
                 let kind = container.provider_map[k].kind;
                 let n = graph.add_node(AnalysisNode {
                     registration: Some(kind),
@@ -732,14 +732,13 @@ impl Container {
         let mut errors = graph
             .node_indices()
             .filter(|i| graph[*i].registration.is_none())
-            .map(|i| {
+            .flat_map(|i| {
                 let to = &graph[i].id;
                 graph
                     .neighbors_directed(i, Direction::Incoming)
                     .map(|from| AnalysisError::Missing(graph[from].id, to))
                     .collect::<Vec<_>>()
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         // Do any cycles exist?
@@ -747,7 +746,7 @@ impl Container {
             errors.push(AnalysisError::Cycle(graph[cycle.node_id()].id));
         }
 
-        if errors.len() > 0 {
+        if !errors.is_empty() {
             Err(errors)
         } else {
             Ok(())
@@ -817,14 +816,7 @@ impl ContainerBuilder {
         #[cfg(feature = "debug")]
         let deps = registration.provider.dependencies();
         self.provider_map.insert(
-            #[cfg(feature = "debug")]
-            {
-                key.clone()
-            },
-            #[cfg(not(feature = "debug"))]
-            {
-                key
-            },
+            key,
             Registration {
                 kind: registration.kind,
                 provider: Arc::new(Self::get_arc(registration.provider))
@@ -1089,6 +1081,7 @@ mod test {
     #[test]
     fn container_is_clonable() {
         let container = ContainerBuilder::new().build();
+        #[allow(clippy::redundant_clone)]
         let _container = container.clone();
     }
 }
