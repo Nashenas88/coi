@@ -1,6 +1,6 @@
 [package]
 name = "coi"
-version = "0.10.1"
+version = "0.10.2"
 authors = ["Paul Daniel Faria <Nashenas88@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -15,7 +15,7 @@ petgraph = { version = "0.6.2", optional = true }
 thiserror = "1.0"
 
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5.1"
 
 [features]
 default = ["derive"]
